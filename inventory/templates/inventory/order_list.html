@@ -1,0 +1,102 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Order History - {{ category_name }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Order History — {{ category_name }}</h5>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <input type="date" name="from" class="form-control" value="{{ from_date }}" placeholder="From">
+        </div>
+        <div class="col-auto">
+            <input type="date" name="to" class="form-control" value="{{ to_date }}" placeholder="To">
+        </div>
+        <div class="col-auto">
+            <input type="date" name="date" class="form-control" value="{{ search_date }}">
+        </div>
+        <div class="col-auto">
+            <select name="month" class="form-select">
+                <option value="">All months</option>
+                <option value="1" {% if search_month == "1" %}selected{% endif %}>January</option>
+                <option value="2" {% if search_month == "2" %}selected{% endif %}>February</option>
+                <option value="3" {% if search_month == "3" %}selected{% endif %}>March</option>
+                <option value="4" {% if search_month == "4" %}selected{% endif %}>April</option>
+                <option value="5" {% if search_month == "5" %}selected{% endif %}>May</option>
+                <option value="6" {% if search_month == "6" %}selected{% endif %}>June</option>
+                <option value="7" {% if search_month == "7" %}selected{% endif %}>July</option>
+                <option value="8" {% if search_month == "8" %}selected{% endif %}>August</option>
+                <option value="9" {% if search_month == "9" %}selected{% endif %}>September</option>
+                <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
+                <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
+                <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <select name="day" class="form-select">
+                <option value="">All days</option>
+                <option value="1" {% if search_day == "1" %}selected{% endif %}>Sunday</option>
+                <option value="2" {% if search_day == "2" %}selected{% endif %}>Monday</option>
+                <option value="3" {% if search_day == "3" %}selected{% endif %}>Tuesday</option>
+                <option value="4" {% if search_day == "4" %}selected{% endif %}>Wednesday</option>
+                <option value="5" {% if search_day == "5" %}selected{% endif %}>Thursday</option>
+                <option value="6" {% if search_day == "6" %}selected{% endif %}>Friday</option>
+                <option value="7" {% if search_day == "7" %}selected{% endif %}>Saturday</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Filter</button>
+        </div>
+        <div class="col-auto">
+            <a class="btn btn-outline-primary" href="{% url 'inventory:order_history_pdf' category=category %}?from={{ from_date }}&to={{ to_date }}&date={{ search_date }}&month={{ search_month }}&day={{ search_day }}">Download PDF</a>
+        </div>
+    </form>
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Asset ID</th>
+                        <th>Item</th>
+                        <th>Requested</th>
+                        <th>Provided</th>
+                        <th>Unit price</th>
+                        <th>Total requested</th>
+                        <th>Total provided</th>
+                        <th>Status</th>
+                        {% if user_can_edit %}<th>Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ o.product.asset_id }}</td>
+                        <td>{{ o.product.item_name }}</td>
+                        <td>{{ o.quantity_requested }}</td>
+                        <td>{{ o.quantity_provided }}</td>
+                        <td>{{ o.unit_price|default:"-" }}</td>
+                        <td>{{ o.total_cost_requested|default:"-" }}</td>
+                        <td>{{ o.total_cost_provided|default:"-" }}</td>
+                        <td><span class="badge bg-{% if o.status == 'completed' %}success{% elif o.status == 'disclosed' %}secondary{% else %}warning{% endif %}">{{ o.get_status_display }}</span></td>
+                        {% if user_can_edit %}
+                        <td>
+                            {% if o.status != 'completed' and o.status != 'disclosed' %}
+                            <form method="post" action="{% url 'inventory:order_fulfill' pk=o.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="number" name="quantity_provided" min="0" value="0" class="form-control form-control-sm d-inline-block" style="width:80px">
+                                <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                            </form>
+                            <form method="post" action="{% url 'inventory:order_mark_disclosed' pk=o.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-secondary">Mark Disclosed</button></form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="{% if user_can_edit %}11{% else %}10{% endif %}" class="text-muted">No orders found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

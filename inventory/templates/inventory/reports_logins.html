@@ -1,0 +1,45 @@
+{% extends 'inventory/base.html' %}
+{% block title %}All Logins{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">All Logins</h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:reports_logins_pdf' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">Download PDF</a>
+        </div>
+    </div>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto"><input type="date" name="from" class="form-control" value="{{ from_date }}" placeholder="From"></div>
+        <div class="col-auto"><input type="date" name="to" class="form-control" value="{{ to_date }}" placeholder="To"></div>
+        <div class="col-auto">
+            <select name="month" class="form-select">
+                <option value="">All months</option>
+                <option value="1" {% if search_month == "1" %}selected{% endif %}>January</option>
+                <option value="2" {% if search_month == "2" %}selected{% endif %}>February</option>
+                <option value="3" {% if search_month == "3" %}selected{% endif %}>March</option>
+                <option value="4" {% if search_month == "4" %}selected{% endif %}>April</option>
+                <option value="5" {% if search_month == "5" %}selected{% endif %}>May</option>
+                <option value="6" {% if search_month == "6" %}selected{% endif %}>June</option>
+                <option value="7" {% if search_month == "7" %}selected{% endif %}>July</option>
+                <option value="8" {% if search_month == "8" %}selected{% endif %}>August</option>
+                <option value="9" {% if search_month == "9" %}selected{% endif %}>September</option>
+                <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
+                <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
+                <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
+            </select>
+        </div>
+        <div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button></div>
+    </form>
+    <div class="card"><div class="card-body">
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Username</th><th>Full name</th><th>Stage</th><th>Last login</th></tr></thead>
+            <tbody>
+                {% for u in users %}
+                <tr><td>{{ u.username }}</td><td>{{ u.full_name|default:"-" }}</td><td>{{ u.stage }}</td><td>{{ u.last_login|date:"Y-m-d H:i"|default:"-" }}</td></tr>
+                {% empty %}<tr><td colspan="4" class="text-muted">No data.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
+</div>
+{% endblock %}

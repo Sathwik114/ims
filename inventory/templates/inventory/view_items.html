@@ -1,0 +1,65 @@
+{% extends 'inventory/base.html' %}
+{% block title %}View Items{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">View Items</h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:view_items_pdf' %}?category={{ selected_category }}&q={{ q }}">Download PDF</a>
+        </div>
+    </div>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select name="category" class="form-select">
+                <option value="">All categories</option>
+                {% for c in categories %}
+                <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <input type="text" name="q" class="form-control" placeholder="Search by Asset ID / Item Code / Item Name" value="{{ q }}">
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Search</button>
+            <a class="btn btn-outline-secondary" href="{% url 'inventory:view_items' %}">Reset</a>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Asset ID</th>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>Location</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td>{{ p.get_category_display }}</td>
+                            <td>{{ p.asset_id }}</td>
+                            <td>{{ p.item_code|default:"-" }}</td>
+                            <td>{{ p.item_name }}</td>
+                            <td>{{ p.computed_location|default:p.location }}</td>
+                            <td>{{ p.quantity_available }}</td>
+                            <td>{{ p.price|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted">No results.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

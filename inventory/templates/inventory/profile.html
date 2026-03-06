@@ -1,0 +1,21 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Profile</h5>
+    <div class="card" style="max-width: 400px;">
+        <div class="card-body">
+            <p class="mb-1"><strong>Username:</strong> {{ user.username }}</p>
+            <p class="mb-1"><strong>Full name:</strong> {{ user.full_name|default:"—" }}</p>
+            <p class="mb-1"><strong>Mobile:</strong> {{ user.mobile_number|default:"—" }}</p>
+            <p class="mb-1"><strong>Email:</strong> {{ user.email|default:"—" }}</p>
+            <p class="mb-1"><strong>Stage:</strong> Stage {{ user.stage }}</p>
+            <hr>
+            <a href="{% url 'inventory:change_password' %}" class="btn btn-outline-primary">Settings (Change Password)</a>
+            {% if user_can_manage_users %}
+            <a href="{% url 'inventory:add_user' %}" class="btn btn-outline-secondary">Add User</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

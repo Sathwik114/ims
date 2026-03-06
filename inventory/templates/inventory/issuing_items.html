@@ -1,0 +1,115 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Issuing - {{ category_name }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Issuing Items — {{ category_name }}</h5>
+    <nav class="cat-navbar mb-3">
+        <a class="nav-link" href="{% url 'inventory:category_detail' category=category %}">Back to {{ category_name }}</a>
+    </nav>
+    {% if user_is_stage1 and pending_requests %}
+    <div class="card mb-3 border-warning">
+        <div class="card-body">
+            <h6 class="card-title">Pending approval</h6>
+            <p class="small text-muted">Approve or Disapprove these requests.</p>
+            <ul class="list-unstyled mb-0">
+                {% for ir in pending_requests %}
+                <li class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                    <span>{{ ir.requested_by.get_full_name|default:ir.requested_by.username }} requested {{ ir.quantity }}× {{ ir.product.asset_id }} ({{ ir.product.item_name }}) for {{ ir.receiver_username }}</span>
+                    <span>
+                        <form method="post" action="{% url 'inventory:approve_issue_request' pk=ir.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-success">Approve</button></form>
+                        <form method="post" action="{% url 'inventory:disapprove_issue_request' pk=ir.pk %}" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-secondary">Disapprove</button></form>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <p class="small text-muted">Click an Asset ID to fill the form.</p>
+            <div class="row g-2" id="product-boxes">
+                {% for p in products %}
+                <div class="col-6 col-lg-3">
+                    <div class="item-box text-center" data-asset-id="{{ p.asset_id }}" data-item-name="{{ p.item_name }}" data-location="{{ p.location }}" data-qty="{{ p.quantity_available }}" data-price="{{ p.price|default:'' }}">
+                        <strong>{{ p.asset_id }}</strong><br>
+                        <small class="text-muted">{{ p.item_name }}</small><br>
+                        <small>Qty: {{ p.quantity_available }}</small>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-muted">No products in this category.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="card" style="max-width: 480px;">
+        <div class="card-body">
+            <h6 class="card-title">Issue request</h6>
+            <form method="post" action="{% url 'inventory:submit_issue_request' category=category %}">
+                {% csrf_token %}
+                <input type="hidden" name="asset_id" id="id_asset_id" value="">
+                <div class="mb-2">
+                    <label class="form-label">Asset ID</label>
+                    <input type="text" id="display_asset_id" class="form-control" readonly placeholder="Click an item above">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Item Name</label>
+                    <input type="text" id="display_item_name" class="form-control" readonly>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Location</label>
+                    <input type="text" id="display_location" class="form-control" readonly>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Quantity Available</label>
+                    <input type="text" id="display_qty" class="form-control" readonly>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Receiver username</label>
+                    <input type="text" name="receiver_username" id="id_receiver_username" class="form-control" placeholder="Username" required>
+                    <small class="text-muted">Fetched name: <span id="receiver_name_display"></span></small>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Quantity</label>
+                    {{ form.quantity }}
+                </div>
+                <button type="submit" class="btn btn-primary" id="btn_submit" disabled>Submit request</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+    const boxes = document.querySelectorAll('.item-box');
+    const assetInput = document.getElementById('id_asset_id');
+    const displayAsset = document.getElementById('display_asset_id');
+    const displayName = document.getElementById('display_item_name');
+    const displayLocation = document.getElementById('display_location');
+    const displayQty = document.getElementById('display_qty');
+    const btn = document.getElementById('btn_submit');
+    const receiverInput = document.getElementById('id_receiver_username');
+    const nameDisplay = document.getElementById('receiver_name_display');
+    boxes.forEach(function(box){
+        box.addEventListener('click', function(){
+            boxes.forEach(function(b){ b.classList.remove('selected'); });
+            box.classList.add('selected');
+            assetInput.value = box.dataset.assetId;
+            displayAsset.value = box.dataset.assetId;
+            displayName.value = box.dataset.itemName || '';
+            displayLocation.value = box.dataset.location || '';
+            displayQty.value = box.dataset.qty || '';
+            btn.disabled = false;
+        });
+    });
+    receiverInput.addEventListener('blur', function(){
+        const u = receiverInput.value.trim();
+        if (!u) { nameDisplay.textContent = ''; return; }
+        fetch('{% url "inventory:get_user_by_username" %}?username=' + encodeURIComponent(u))
+            .then(r => r.json())
+            .then(d => { nameDisplay.textContent = d.name || '(not found)'; })
+            .catch(() => { nameDisplay.textContent = ''; });
+    });
+})();
+</script>
+{% endblock %}

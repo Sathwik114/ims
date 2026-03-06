@@ -1,0 +1,29 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Add Rack - {{ category_name }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Add Rack — {{ category_name }}</h5>
+    <div class="card" style="max-width: 400px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Rack Number</label>
+                    {{ form.rack_number }}
+                    {% if form.rack_number.errors %}<div class="text-danger small">{{ form.rack_number.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Number of rows</label>
+                    {{ form.rows }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Number of columns</label>
+                    {{ form.columns }}
+                </div>
+                <button type="submit" class="btn btn-primary">Add Rack</button>
+                <a href="{% url 'inventory:category_detail' category=category %}" class="btn btn-outline-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

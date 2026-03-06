@@ -1,0 +1,31 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Upload Items - {{ category_name }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Upload Items — {{ category_name }}</h5>
+    <nav class="cat-navbar mb-3">
+        <a class="nav-link" href="{% url 'inventory:upload_history' category=category %}">Upload History</a>
+    </nav>
+    <div class="card" style="max-width: 520px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Select Asset ID</label>
+                    <select name="asset_id" class="form-control" required>
+                        <option value="">-- Select --</option>
+                        {% for p in products %}
+                        <option value="{{ p.asset_id }}">{{ p.asset_id }} — {{ p.item_name }} (current: {{ p.quantity_available }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity to add</label>
+                    {{ form.quantity_added }}
+                </div>
+                <button type="submit" class="btn btn-primary">Add quantity</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

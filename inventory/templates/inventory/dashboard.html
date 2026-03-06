@@ -1,0 +1,145 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-4">Dashboard</h5>
+    <div class="row">
+        <div class="{% if show_right_panel %}col-lg-8{% else %}col-lg-12{% endif %}">
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Networking</h6>
+                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
+                                <canvas id="pie_networking"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Hardware</h6>
+                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
+                                <canvas id="pie_hardware"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Security</h6>
+                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
+                                <canvas id="pie_security"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Server Parts</h6>
+                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
+                                <canvas id="pie_server_parts"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">Available items by Category</h6>
+                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
+                                <canvas id="pie_overall"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if show_right_panel %}
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title">Recent logins</h6>
+                    <ul class="list-group list-group-flush">
+                        {% for u in recent_logins %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ u.username }}</span>
+                            <span class="text-muted small">{{ u.last_login|date:"Y-m-d H:i" }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted">No logins yet.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Recent issued items</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>When</th>
+                                    <th>Item</th>
+                                    <th>To</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in recent_issued %}
+                                <tr>
+                                    <td class="text-muted small">{{ r.issued_at|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ r.product.asset_id }} — {{ r.product.item_name }}</td>
+                                    <td>{{ r.receiver.username|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="3" class="text-muted">No issues yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+    const overall = {{ overall_pie_json|safe }};
+    const perCategory = {{ per_category_json|safe }};
+
+    function makePie(elId, series) {
+        const ctx = document.getElementById(elId);
+        if (!ctx) return;
+        if (!series || series.length === 0) {
+            series = [{ label: 'No data', value: 1 }];
+        }
+        const colors = [
+            '#4da6ff', '#6c5ce7', '#00b894', '#fdcb6e', '#ff7675', '#00cec9',
+            '#e17055', '#0984e3', '#2d3436', '#b2bec3'
+        ];
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: (series || []).map(s => s.label),
+                datasets: [{
+                    data: (series || []).map(s => s.value),
+                    backgroundColor: colors
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    makePie('pie_networking', perCategory.networking || []);
+    makePie('pie_hardware', perCategory.hardware || []);
+    makePie('pie_security', perCategory.security || []);
+    makePie('pie_server_parts', perCategory.server_parts || []);
+    makePie('pie_overall', overall || []);
+})();
+</script>
+{% endblock %}

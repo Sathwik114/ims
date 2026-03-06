@@ -1,0 +1,75 @@
+{% extends 'inventory/base.html' %}
+{% block title %}My History{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">My History</h5>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">My issue requests</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in my_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td>{{ ir.get_status_display }}</td>
+                            <td class="text-muted small">{{ ir.rejection_reason|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h6 class="card-title">Issued to me</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Unit price</th>
+                            <th>Total</th>
+                            <th>Approved by</th>
+                            <th>Issued by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in my_issued %}
+                        <tr>
+                            <td class="text-muted small">{{ r.issued_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ r.product.asset_id }} — {{ r.product.item_name }}</td>
+                            <td>{{ r.quantity }}</td>
+                            <td>{{ r.unit_price|default:"-" }}</td>
+                            <td>{{ r.total_cost|default:"-" }}</td>
+                            <td>{{ r.approved_by.username|default:"-" }}</td>
+                            <td>{{ r.issued_by.username|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted">No issued history.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

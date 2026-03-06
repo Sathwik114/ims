@@ -1,0 +1,54 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">Notification Center</h5>
+        <form method="post" action="{% url 'inventory:notification_mark_all_read' %}">
+            {% csrf_token %}
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Mark all read</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Title</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for n in notifications %}
+                        <tr>
+                            <td class="text-muted small">{{ n.created_at|date:"Y-m-d H:i" }}</td>
+                            <td><strong>{{ n.title }}</strong><br><span class="text-muted small">{{ n.kind }}</span></td>
+                            <td>{{ n.message }}</td>
+                            <td>
+                                {% if n.read %}<span class="badge bg-secondary">Read</span>{% else %}<span class="badge bg-primary">New</span>{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if n.link %}<a class="btn btn-sm btn-outline-primary" href="{{ n.link }}">Open</a>{% endif %}
+                                {% if not n.read %}
+                                <form method="post" action="{% url 'inventory:notification_mark_read' pk=n.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Mark read</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No notifications.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

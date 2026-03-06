@@ -1,0 +1,91 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Item Requests - Issued History{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">Item Requests – History</h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+            <a class="btn btn-outline-primary btn-sm"
+               href="{% url 'inventory:item_requests_history_pdf' %}?asset_id={{ asset_id }}&from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">
+                Download PDF
+            </a>
+        </div>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <input type="text" name="asset_id" class="form-control" placeholder="Asset ID" value="{{ asset_id }}">
+        </div>
+        <div class="col-auto">
+            <input type="date" name="from" class="form-control" value="{{ from_date }}" placeholder="From">
+        </div>
+        <div class="col-auto">
+            <input type="date" name="to" class="form-control" value="{{ to_date }}" placeholder="To">
+        </div>
+        <div class="col-auto">
+            <select name="month" class="form-select">
+                <option value="">All months</option>
+                <option value="1" {% if search_month == "1" %}selected{% endif %}>January</option>
+                <option value="2" {% if search_month == "2" %}selected{% endif %}>February</option>
+                <option value="3" {% if search_month == "3" %}selected{% endif %}>March</option>
+                <option value="4" {% if search_month == "4" %}selected{% endif %}>April</option>
+                <option value="5" {% if search_month == "5" %}selected{% endif %}>May</option>
+                <option value="6" {% if search_month == "6" %}selected{% endif %}>June</option>
+                <option value="7" {% if search_month == "7" %}selected{% endif %}>July</option>
+                <option value="8" {% if search_month == "8" %}selected{% endif %}>August</option>
+                <option value="9" {% if search_month == "9" %}selected{% endif %}>September</option>
+                <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
+                <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
+                <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Filter</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date &amp; time</th>
+                            <th>Asset ID</th>
+                            <th>Item</th>
+                            <th>User</th>
+                            <th>Mobile</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Approved by</th>
+                            <th>Rejected by</th>
+                            <th>Reason</th>
+                            <th>Issued by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in records %}
+                        <tr>
+                            <td class="text-muted small">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ r.product.asset_id }}</td>
+                            <td>{{ r.product.item_name }}</td>
+                            <td>{{ r.requested_by_full_name|default:r.requested_by.username|default:"-" }}</td>
+                            <td>{{ r.requested_by_mobile|default:"-" }}</td>
+                            <td>{{ r.quantity }}</td>
+                            <td>{{ r.get_status_display }}</td>
+                            <td>{{ r.approved_by.username|default:"-" }}</td>
+                            <td>{{ r.rejected_by.username|default:"-" }}</td>
+                            <td class="text-muted small">{{ r.rejection_reason|default:"-" }}</td>
+                            <td>{{ r.issued_by.username|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="11" class="text-muted">No history.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

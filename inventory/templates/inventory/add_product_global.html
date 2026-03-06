@@ -1,0 +1,79 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Add Item{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Add Item</h5>
+    <div class="card" style="max-width: 720px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Category</label>
+                        {{ form.category }}
+                        {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Asset ID</label>
+                        {{ form.asset_id }}
+                        {% if form.asset_id.errors %}<div class="text-danger small">{{ form.asset_id.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Item Code</label>
+                        {{ form.item_code }}
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Item Name</label>
+                        {{ form.item_name }}
+                        {% if form.item_name.errors %}<div class="text-danger small">{{ form.item_name.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label">Cabin name (optional)</label>
+                        {{ form.cabin_name }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Rack number</label>
+                        {{ form.rack }}
+                        {% if form.rack.errors %}<div class="text-danger small">{{ form.rack.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Row number</label>
+                        {{ form.row_number }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Column number</label>
+                        {{ form.column_number }}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Measurement unit</label>
+                        {{ form.measurement_unit }}
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Measurement value</label>
+                        {{ form.measurement_value }}
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Quantity available</label>
+                        {{ form.quantity_available }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Price (unit)</label>
+                        {{ form.price }}
+                    </div>
+                </div>
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+            <p class="text-muted small mt-3 mb-0">
+                Location is stored as: <code>Cabin / Rack / Row / Column</code>. Items can only be added if a rack exists.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

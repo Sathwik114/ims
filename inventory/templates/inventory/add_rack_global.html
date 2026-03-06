@@ -1,0 +1,44 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Add Rack{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Add Rack</h5>
+    <div class="card" style="max-width: 520px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    {{ form.category }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Cabin name</label>
+                    {{ form.cabin_name }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Rack number</label>
+                    {{ form.rack_number }}
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Number of rows</label>
+                        {{ form.rows }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Number of columns</label>
+                        {{ form.columns }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Number of racks</label>
+                        {{ form.number_of_racks }}
+                    </div>
+                </div>
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

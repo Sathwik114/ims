@@ -1,0 +1,113 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Upload Requests{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">Upload Requests (Management)</h5>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:management_upload_requests_pdf' %}?category={{ selected_category }}">Download PDF</a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Create upload request</h6>
+            <form method="post" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="request">
+                <div class="col-md-4">
+                    <label class="form-label">Asset ID</label>
+                    <select name="asset_id" class="form-select" required>
+                        <option value="">-- Select --</option>
+                        {% for p in products %}
+                        <option value="{{ p.asset_id }}">{{ p.get_category_display }} — {{ p.asset_id }} — {{ p.item_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Quantity requested</label>
+                    <input type="number" name="quantity_requested" class="form-control" min="1" required>
+                </div>
+                <div class="col-md-5">
+                    <button type="submit" class="btn btn-primary">Save request</button>
+                    <span class="text-muted small ms-2">This is internal and does not create notifications.</span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex gap-2 mb-2">
+                <form method="get" class="d-flex gap-2">
+                    <select name="category" class="form-select form-select-sm" style="max-width: 220px;">
+                        <option value="">All categories</option>
+                        {% for c in categories %}
+                        <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Request ID</th>
+                            <th>Asset ID</th>
+                            <th>Item</th>
+                            <th>Requested</th>
+                            <th>Received</th>
+                            <th>Remaining</th>
+                            <th>Status</th>
+                            <th>Requested by</th>
+                            {% if can_fulfill %}<th>Actions</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                        <tr>
+                            <td class="text-muted small">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                            <td><strong>{{ r.request_id }}</strong></td>
+                            <td>{{ r.product.asset_id }}</td>
+                            <td>{{ r.product.item_name }}</td>
+                            <td>{{ r.quantity_requested }}</td>
+                            <td>{{ r.quantity_received }}</td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ r.remaining }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if r.status == 'completed' %}success{% elif r.status == 'disclosed' %}secondary{% else %}warning{% endif %}">
+                                    {{ r.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ r.requested_by.username|default:"-" }}</td>
+                            {% if can_fulfill %}
+                            <td>
+                                {% if r.status == 'pending' %}
+                                <form method="post" action="{% url 'inventory:management_upload_request_fulfill' pk=r.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="number" name="quantity_received" min="1" class="form-control form-control-sm d-inline-block" style="width:120px" placeholder="Received now">
+                                    <button class="btn btn-sm btn-primary" type="submit">Submit</button>
+                                </form>
+                                <form method="post" action="{% url 'inventory:management_upload_request_disclose' pk=r.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Disclose</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="{% if can_fulfill %}10{% else %}9{% endif %}" class="text-muted">No requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

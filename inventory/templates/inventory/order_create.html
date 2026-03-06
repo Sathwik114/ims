@@ -1,0 +1,43 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Order - {{ category_name }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Order — {{ category_name }}</h5>
+    <nav class="cat-navbar mb-3">
+        <a class="nav-link" href="{% url 'inventory:order_list' category=category %}">Order History</a>
+    </nav>
+    <div class="card" style="max-width: 520px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Select Asset ID</label>
+                    <select name="asset_id" id="order_asset" class="form-control" required>
+                        <option value="">-- Select --</option>
+                        {% for p in products %}
+                        <option value="{{ p.asset_id }}" data-name="{{ p.item_name }}" data-qty="{{ p.quantity_available }}">{{ p.asset_id }} — {{ p.item_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Item details</label>
+                    <p id="order_details" class="text-muted small mb-0">Select an asset to see details.</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity requested</label>
+                    {{ form.quantity_requested }}
+                </div>
+                <button type="submit" class="btn btn-primary">Save request</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.getElementById('order_asset').addEventListener('change', function(){
+    const opt = this.options[this.selectedIndex];
+    const d = document.getElementById('order_details');
+    if (opt.value) d.textContent = 'Item: ' + opt.dataset.name + ' | Available: ' + opt.dataset.qty;
+    else d.textContent = 'Select an asset to see details.';
+});
+</script>
+{% endblock %}

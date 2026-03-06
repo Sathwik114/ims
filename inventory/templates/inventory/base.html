@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}IMS{% endblock %} | Inventory Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --navbar-height: 56px; }
+        body { min-height: 100vh; background: #f4f6f9; }
+        .main-wrap { padding: 1.5rem; padding-top: calc(var(--navbar-height) + 1rem); }
+        .top-navbar {
+            height: var(--navbar-height); background: #fff; border-bottom: 1px solid #dee2e6;
+            position: fixed; left: 0; right: 0; top: 0; z-index: 1000; padding: 0 1.5rem;
+        }
+        .cat-navbar { background: #fff; border-radius: 8px; padding: 0.5rem 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-radius: 10px; }
+        .item-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s; }
+        .item-box:hover { border-color: #4da6ff; background: #f8fbff; }
+        .item-box.selected { border-color: #4da6ff; background: #e8f4ff; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <nav class="top-navbar d-flex align-items-center">
+        <span class="fw-semibold text-dark me-3">Inventory Management System</span>
+
+        <a class="btn btn-link text-decoration-none" href="{% url 'inventory:dashboard' %}">Dashboard</a>
+
+        <div class="dropdown">
+            <a class="btn btn-link text-decoration-none dropdown-toggle" href="#" data-bs-toggle="dropdown">View Items</a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'inventory:view_items' %}">Search / View</a></li>
+                <li><hr class="dropdown-divider"></li>
+                {% for cat in navbar_categories %}
+                <li><a class="dropdown-item" href="{% url 'inventory:category_detail' category=cat.slug %}">{{ cat.name }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if user_can_edit %}
+        <div class="dropdown">
+            <a class="btn btn-link text-decoration-none dropdown-toggle" href="#" data-bs-toggle="dropdown">Add</a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'inventory:add_product_global' %}">Add Item</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:add_rack_global' %}">Add Rack</a></li>
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if user_can_request_issue or user_can_approve_issue_requests or user_can_issue_items %}
+        <div class="dropdown">
+            <a class="btn btn-link text-decoration-none dropdown-toggle" href="#" data-bs-toggle="dropdown">Item Requests</a>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'inventory:issue_requests' %}">Requests</a></li>
+                {% if user.stage != 3 %}
+                <li><a class="dropdown-item" href="{% url 'inventory:item_requests_history' %}">Issued History</a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if user.stage != 3 %}
+        <a class="btn btn-link text-decoration-none" href="{% url 'inventory:management_upload_requests' %}">Upload Requests</a>
+        {% endif %}
+
+        {% if user.stage == 3 %}
+        <a class="btn btn-link text-decoration-none" href="{% url 'inventory:my_history' %}">My History</a>
+        {% endif %}
+
+        <div class="dropdown ms-auto me-2">
+            <a class="btn btn-outline-secondary position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-label="Notifications">
+                <i class="bi bi-bell"></i>
+                {% if unread_notifications_count %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ unread_notifications_count }}</span>
+                {% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" style="min-width: 320px;">
+                <li class="px-3 py-2 text-muted small">Notifications</li>
+                {% for n in unread_notifications %}
+                <li>
+                    <a class="dropdown-item small" href="{% if n.link %}{{ n.link }}{% else %}{% url 'inventory:notifications' %}{% endif %}">
+                        <strong>{{ n.title }}</strong><br>
+                        <span class="text-muted">{{ n.message|truncatechars:90 }}</span>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="px-3 py-2 text-muted small">No new notifications.</li>
+                {% endfor %}
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:notifications' %}">Open notification center</a></li>
+            </ul>
+        </div>
+
+        <div class="dropdown">
+            <a class="btn btn-outline-secondary dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-1"></i> {{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{% url 'inventory:profile' %}">Profile</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:change_password' %}">Settings (Change Password)</a></li>
+        {% if user_can_manage_users %}
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'inventory:add_user' %}">Add User</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><span class="dropdown-header">Reports</span></li>
+        <li><a class="dropdown-item" href="{% url 'inventory:reports_logins' %}">All logins</a></li>
+        <li><a class="dropdown-item" href="{% url 'inventory:reports_transactions' %}">All transactions</a></li>
+        <li><a class="dropdown-item" href="{% url 'inventory:reports_updates' %}">All updates</a></li>
+        {% endif %}
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="{% url 'inventory:logout' %}">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+    {% endif %}
+    <main class="{% if user.is_authenticated %}main-wrap{% endif %}">
+        {% if messages %}
+        <div class="container-fluid">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

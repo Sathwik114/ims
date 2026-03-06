@@ -1,0 +1,204 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Issue Requests{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Issue Requests</h5>
+
+    {% if user.stage == 3 %}
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Request an item</h6>
+            <form method="get" class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Category</label>
+                    <select name="category" class="form-select" onchange="this.form.submit()">
+                        {% for c in navbar_categories %}
+                        <option value="{{ c.slug }}" {% if category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <p class="text-muted small mb-0">
+                        Requester: <strong>{{ user.full_name|default:user.username }}</strong>
+                        {% if user.mobile_number %} ({{ user.mobile_number }}){% endif %}
+                    </p>
+                </div>
+            </form>
+
+            {% if user_can_request_issue %}
+            <div class="row g-2 mb-3">
+                {% for p in products %}
+                <div class="col-6 col-lg-3">
+                    <div class="item-box text-center" data-asset-id="{{ p.asset_id }}" data-name="{{ p.item_name }}" data-qty="{{ p.quantity_available }}">
+                        <strong>{{ p.asset_id }}</strong><br>
+                        <small class="text-muted">{{ p.item_name }}</small><br>
+                        <small>Qty: {{ p.quantity_available }}</small>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-muted">No items in this category.</div>
+                {% endfor %}
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="request">
+                <input type="hidden" name="asset_id" id="req_asset_id" value="">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Selected Asset ID</label>
+                        <input class="form-control" id="req_asset_display" readonly placeholder="Click an item above">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Quantity</label>
+                        {{ form.quantity }}
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100" id="btn_request" disabled>Submit request</button>
+                    </div>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if user_can_approve_issue_requests %}
+    <div class="card mb-3 border-warning">
+        <div class="card-body">
+            <h6 class="card-title">Pending approvals (Stage 1/2)</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>User</th>
+                            <th>Mobile</th>
+                            <th>Item</th>
+                            <th>Available</th>
+                            <th>Qty</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in pending_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
+                            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
+                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
+                            <td>{{ ir.product.quantity_available }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td class="d-flex gap-2">
+                                <form method="post" action="{% url 'inventory:issue_request_approve' pk=ir.pk %}">{% csrf_token %}
+                                    <button class="btn btn-sm btn-success" type="submit">Approve</button>
+                                </form>
+                                <form method="post" action="{% url 'inventory:issue_request_reject' pk=ir.pk %}">{% csrf_token %}
+                                    <input name="reason" class="form-control form-control-sm d-inline-block" style="width: 220px;" placeholder="Reject reason (required)">
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted">No pending requests.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if user_can_approve_issue_requests %}
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Approved requests</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Approved</th>
+                            <th>User</th>
+                            <th>Mobile</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Approved by</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in approved_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.approved_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
+                            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
+                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td>{{ ir.approved_by.username|default:"-" }}</td>
+                            <td>
+                                <form method="post" action="{% url 'inventory:issue_request_issue' pk=ir.pk %}" class="d-inline">{% csrf_token %}
+                                    <button class="btn btn-sm btn-primary" type="submit">Mark as issued</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-muted">No approved requests waiting for issue.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <h6 class="card-title">My requests</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in my_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td>{{ ir.get_status_display }}</td>
+                            <td class="text-muted small">{{ ir.rejection_reason|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">No requests yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const boxes = document.querySelectorAll('.item-box');
+    const assetHidden = document.getElementById('req_asset_id');
+    const assetDisplay = document.getElementById('req_asset_display');
+    const btn = document.getElementById('btn_request');
+    boxes.forEach(function(box){
+        box.addEventListener('click', function(){
+            boxes.forEach(b => b.classList.remove('selected'));
+            box.classList.add('selected');
+            assetHidden.value = box.dataset.assetId;
+            assetDisplay.value = box.dataset.assetId + ' — ' + (box.dataset.name || '');
+            btn.disabled = false;
+        });
+    });
+})();
+</script>
+{% endblock %}
