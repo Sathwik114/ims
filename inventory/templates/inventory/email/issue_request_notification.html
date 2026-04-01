@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Issue Request {{ status|title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #2563eb;
+            margin: 0;
+            font-size: 24px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .status-pending { background-color: #fef3c7; color: #92400e; }
+        .status-approved { background-color: #d1fae5; color: #065f46; }
+        .status-rejected { background-color: #fee2e2; color: #991b1b; }
+        .status-issued { background-color: #dbeafe; color: #1e40af; }
+        
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .details-table td {
+            padding: 10px 5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .details-table td:first-child {
+            font-weight: bold;
+            width: 140px;
+            color: #374151;
+        }
+        .details-table tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        
+        .message-box {
+            background-color: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .rejection-reason {
+            background-color: #fef2f2;
+            border-left-color: #dc2626;
+            color: #991b1b;
+        }
+        
+        .action-button {
+            display: inline-block;
+            background-color: #16a34a;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .action-button:hover {
+            background-color: #15803d;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #6b7280;
+            text-align: center;
+        }
+        
+        .urgency-high {
+            color: #dc2626;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Issue Request {{ status|title }}</h2>
+            <p>Your request has been {{ status }}{% if user_stage == 'stage3' %}. You can view your request history to track the status.{% endif %}</p>
+        
+        {% if user_stage == 'stage3' %}
+        <p style="font-size: 16px; color: #6b7280; margin: 20px 0;">
+            <strong>Note:</strong> As a Stage 3 user, you can view all your requests in your history page.
+        </p>
+        {% endif %}
+        </div>
+        
+        <div class="message-box">
+            {{ message }}
+        </div>
+        
+        {% if rejection_reason %}
+        <div class="message-box rejection-reason">
+            <strong>Reason:</strong> {{ rejection_reason }}
+        </div>
+        {% endif %}
+        
+        <h3>Request Details:</h3>
+        <table class="details-table">
+            <tr>
+                <td>Request ID:</td>
+                <td>#{{ issue_request.request_id }}</td>
+            </tr>
+            <tr>
+                <td>Requested By:</td>
+                <td>{{ issue_request.requested_by.username }} | {{ issue_request.requested_by.get_full_name }}</td>
+            </tr>
+            <tr>
+                <td>Email:</td>
+                <td>{{ issue_request.requested_by.email }}</td>
+            </tr>
+            <tr>
+                <td>Mobile:</td>
+                <td>{{ issue_request.requested_by_mobile|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Asset ID:</td>
+                <td>{{ issue_request.product.asset_id }}</td>
+            </tr>
+            <tr>
+                <td>Item Name:</td>
+                <td>{{ issue_request.product.item_name }}</td>
+            </tr>
+            <tr>
+                <td>Category:</td>
+                <td>{{ issue_request.product.get_category_display }}</td>
+            </tr>
+            <tr>
+                <td>Location:</td>
+                <td>{{ issue_request.product.computed_location|default:"-" }}</td>
+            </tr>
+            <tr>
+                <td>Quantity Requested:</td>
+                <td>{{ issue_request.quantity }}</td>
+            </tr>
+            {% if issue_request.approved_quantity %}
+            <tr>
+                <td>Quantity Approved:</td>
+                <td>{{ issue_request.approved_quantity }}</td>
+            </tr>
+            {% endif %}
+            {% if issue_request.request_reason %}
+            <tr>
+                <td>Request Reason:</td>
+                <td>{{ issue_request.request_reason }}</td>
+            </tr>
+            {% endif %}
+            {% if issue_request.approval_note %}
+            <tr>
+                <td>Approval Note:</td>
+                <td>{{ issue_request.approval_note }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td>Created At:</td>
+                <td>{{ issue_request.created_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% if issue_request.approved_at %}
+            <tr>
+                <td>Approved At:</td>
+                <td>{{ issue_request.approved_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endif %}
+            {% if issue_request.issued_at %}
+            <tr>
+                <td>Issued At:</td>
+                <td>{{ issue_request.issued_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endif %}
+        </table>
+        
+        <div style="text-align: center;">
+            <div class="action-button">
+            {% if user_stage == 'stage3' %}
+                <a href="{{ link }}">View My History</a>
+            {% else %}
+                <a href="{{ link }}">View Request Details</a>
+            {% endif %}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated notification from the Inventory Management System.</p>
+            <p>If you have any questions, please contact the IT Support team.</p>
+        </div>
+    </div>
+</body>
+</html>

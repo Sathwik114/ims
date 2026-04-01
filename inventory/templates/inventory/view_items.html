@@ -1,65 +1,524 @@
 {% extends 'inventory/base.html' %}
 {% block title %}View Items{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PAGE HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vi-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.85rem;
+    }
+    .vi-header h5 {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1e2035;
+        margin: 0 0 0.1rem;
+        letter-spacing: -0.02em;
+    }
+    .vi-header p {
+        font-size: 0.68rem;
+        color: #6b7490;
+        font-family: var(--mono);
+        margin: 0;
+    }
+    .vi-header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+    .btn-print {
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 0.3rem 0.8rem;
+        border-radius: 8px;
+        border: 1.5px solid rgba(200,205,225,0.9);
+        color: #4a5280;
+        background: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: all 0.15s;
+        line-height: 1.4;
+    }
+    .btn-print:hover { background: #f4f6ff; border-color: #7c3aed; color: #7c3aed; }
+
+    .btn-pdf {
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 0.3rem 0.8rem;
+        border-radius: 8px;
+        border: none;
+        color: #fff;
+        background: linear-gradient(135deg, #7c3aed, #4c6ef5);
+        box-shadow: 0 2px 8px rgba(124,58,237,0.25);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        line-height: 1.4;
+        transition: all 0.15s;
+    }
+    .btn-pdf:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(124,58,237,0.35); color: #fff; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       FILTER ROW
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vi-filters {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        background: #fff;
+        border: 1px solid rgba(200,205,225,0.8);
+        border-radius: 12px;
+        padding: 0.55rem 0.9rem;
+        box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+        margin-bottom: 0.75rem;
+    }
+    .vi-filters select,
+    .vi-filters input[type="text"] {
+        height: 30px;
+        padding: 0 0.65rem;
+        border: 1px solid rgba(180,140,220,0.3);
+        border-radius: 7px;
+        font-size: 0.76rem;
+        font-family: var(--font);
+        background: #fafbff;
+        color: #1e2035;
+        outline: none;
+        transition: border 0.15s, box-shadow 0.15s;
+    }
+    .vi-filters select { max-width: 160px; }
+    .vi-filters input[type="text"] { flex: 1; min-width: 180px; }
+    .vi-filters select:focus,
+    .vi-filters input[type="text"]:focus {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 2.5px rgba(124,58,237,0.10);
+    }
+    .vi-filter-sep { width: 1px; height: 18px; background: rgba(200,205,225,0.8); flex-shrink: 0; }
+    .vi-filter-lbl {
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: #9090b0;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+    .vi-result-lbl {
+        margin-left: auto;
+        font-size: 0.6rem;
+        font-weight: 700;
+        font-family: var(--mono);
+        color: #6d28d9;
+        background: #ede9fe;
+        border: 1px solid rgba(124,58,237,0.25);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        white-space: nowrap;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       TABLE CARD
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vi-card {
+        background: #fff;
+        border: 2px solid #7c3aed;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(124,58,237,0.18), 0 1px 6px rgba(124,58,237,0.10);
+        overflow: hidden;
+    }
+    .vi-card-head {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.6rem 1rem;
+        border-bottom: 2px solid #7c3aed;
+        background: linear-gradient(90deg, #f5f3ff, #ede9fe);
+    }
+    .vi-card-title {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #1e2035;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .vi-card-title i { color: #7c3aed; font-size: 0.78rem; }
+    .vi-count-badge {
+        font-family: var(--mono);
+        font-size: 0.56rem;
+        font-weight: 700;
+        background: #ede9fe;
+        color: #6d28d9;
+        border: 1px solid rgba(124,58,237,0.3);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       TABLE
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vi-tbl-wrap {
+        max-height: 520px;
+        overflow-y: auto;
+    }
+    .vi-tbl-wrap::-webkit-scrollbar { width: 3px; height: 3px; }
+    .vi-tbl-wrap::-webkit-scrollbar-track { background: #f5f3ff; }
+    .vi-tbl-wrap::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.30); border-radius: 4px; }
+
+    .vi-tbl {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    /* thead — purple bg, white text */
+    .vi-tbl thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #1e034e;
+        color: #ffffff;
+        font-family: var(--mono);
+        font-size: 0.58rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.6rem 0.9rem;
+        border-bottom: 2px solid #6d28d9;
+        border-right: 1px solid rgba(255,255,255,0.18);
+        white-space: nowrap;
+        text-align: center;
+    }
+    .vi-tbl thead th:last-child { border-right: none; }
+
+    /* tbody */
+    .vi-tbl tbody tr { transition: background 0.1s; }
+    .vi-tbl tbody tr:hover td { background: #f5f3ff; }
+    .vi-tbl tbody td {
+        padding: 0.52rem 0.9rem;
+        font-size: 0.78rem;
+        color: #111827;
+        font-weight: 400;
+        vertical-align: middle;
+        text-align: center;
+        border-bottom: 1px solid rgba(124,58,237,0.12);
+        border-right: 1px solid rgba(124,58,237,0.10);
+    }
+    .vi-tbl tbody td:last-child { border-right: none; }
+    .vi-tbl tbody tr:last-child td { border-bottom: none; }
+
+    /* ── plain text overrides — NO chips, NO colours ── */
+    .vi-tbl tbody td .plain-mono {
+        font-family: var(--mono);
+        font-size: 0.74rem;
+        color: #111827;
+    }
+    .vi-tbl tbody td .plain-bold {
+        font-weight: 600;
+        color: #111827;
+    }
+    .vi-tbl tbody td .plain-muted {
+        color: #6b7490;
+        font-size: 0.75rem;
+    }
+
+    /* ── Action buttons only — keep styled ── */
+    .btn-edit {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.22rem 0.58rem;
+        border-radius: 7px;
+        border: 1.5px solid rgba(76,110,245,0.35);
+        color: #4c6ef5;
+        background: #eef2ff;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        white-space: nowrap;
+        transition: all 0.15s;
+        line-height: 1.4;
+    }
+    .btn-edit:hover { background: #4c6ef5; color: #fff; border-color: #4c6ef5; transform: translateY(-1px); }
+
+    .btn-del {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.22rem 0.58rem;
+        border-radius: 7px;
+        border: 1.5px solid rgba(239,68,68,0.3);
+        color: #dc2626;
+        background: #fef2f2;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.28rem;
+        white-space: nowrap;
+        transition: all 0.15s;
+        line-height: 1.4;
+    }
+    .btn-del:hover { background: #dc2626; color: #fff; border-color: #dc2626; transform: translateY(-1px); }
+
+    /* empty */
+    .vi-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: #6b7490;
+        font-size: 0.78rem;
+    }
+    .vi-empty i { font-size: 1.8rem; color: #c4b5fd; display: block; margin-bottom: 0.5rem; }
+
+    tr.vi-hidden { display: none !important; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PRINT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .print-heading, .print-subheading { display: none; }
+
+    @media print {
+        @page { size: landscape; margin: 12mm; }
+
+        .top-navbar, .vi-header, .vi-filters,
+        nav, header, footer { display: none !important; }
+
+        body { background: #fff !important; color: #000 !important; }
+
+        .print-heading {
+            display: block !important;
+            font-size: 14pt; font-weight: 700;
+            font-family: sans-serif; margin-bottom: 4pt; color: #000;
+        }
+        .print-subheading {
+            display: block !important;
+            font-size: 8pt; font-family: monospace; color: #555; margin-bottom: 10pt;
+        }
+
+        .vi-card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+        .vi-tbl-wrap { max-height: none !important; overflow: visible !important; }
+
+        .col-actions { display: none !important; }
+
+        .vi-tbl thead th {
+            background: #eee !important; color: #000 !important;
+            border: 1pt solid #aaa !important; font-size: 7pt !important;
+            padding: 4pt 5pt !important; position: static !important;
+        }
+        .vi-tbl tbody td {
+            border: 1pt solid #ccc !important; font-size: 8pt !important;
+            padding: 3pt 5pt !important; color: #000 !important; background: #fff !important;
+        }
+        .vi-tbl tbody tr:nth-child(even) td { background: #f9f9f9 !important; }
+        tr { page-break-inside: avoid; }
+        tr.vi-hidden { display: none !important; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5 class="mb-0">View Items</h5>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
-            <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:view_items_pdf' %}?category={{ selected_category }}&q={{ q }}">Download PDF</a>
-        </div>
-    </div>
-    <form method="get" class="row g-2 mb-3">
-        <div class="col-md-3">
-            <select name="category" class="form-select">
-                <option value="">All categories</option>
-                {% for c in categories %}
-                <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-6">
-            <input type="text" name="q" class="form-control" placeholder="Search by Asset ID / Item Code / Item Name" value="{{ q }}">
-        </div>
-        <div class="col-md-3 d-flex gap-2">
-            <button class="btn btn-primary" type="submit">Search</button>
-            <a class="btn btn-outline-secondary" href="{% url 'inventory:view_items' %}">Reset</a>
-        </div>
-    </form>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Asset ID</th>
-                            <th>Item Code</th>
-                            <th>Item Name</th>
-                            <th>Location</th>
-                            <th>Qty</th>
-                            <th>Price</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in products %}
-                        <tr>
-                            <td>{{ p.get_category_display }}</td>
-                            <td>{{ p.asset_id }}</td>
-                            <td>{{ p.item_code|default:"-" }}</td>
-                            <td>{{ p.item_name }}</td>
-                            <td>{{ p.computed_location|default:p.location }}</td>
-                            <td>{{ p.quantity_available }}</td>
-                            <td>{{ p.price|default:"-" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="7" class="text-muted">No results.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <!-- Header -->
+    <div class="vi-header">
+        <div>
+            <h5>View Items</h5>
+            <p>Browse and manage inventory items</p>
+        </div>
+        <div class="vi-header-actions">
+            <button class="btn-print" onclick="doPrint()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <a class="btn-pdf" href="{% url 'inventory:view_items_excel' %}?category={{ selected_category }}&q={{ q }}">
+                <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
         </div>
     </div>
+
+    <!-- Filter row — auto search, no button -->
+    <div class="vi-filters">
+        {% if not user.is_stage3 %}
+        <span class="vi-filter-lbl">Category</span>
+        <select id="vi-cat" onchange="viFilter()">
+            <option value="">All</option>
+            {% for c in categories %}
+            <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="vi-filter-sep"></div>
+        {% endif %}
+        <span class="vi-filter-lbl">Search</span>
+        <input type="text" id="vi-q"
+               placeholder="Asset ID / Item Code / Item Name"
+               value="{{ q }}" oninput="viFilter()">
+        <span class="vi-result-lbl" id="vi-badge">{{ products|length }} item{{ products|length|pluralize }}</span>
+    </div>
+
+    <!-- Print headings -->
+    <div class="print-heading"    id="print-heading">Inventory Report</div>
+    <div class="print-subheading" id="print-subheading"></div>
+
+    <!-- Table card -->
+    <div class="vi-card">
+        <div class="vi-card-head">
+           - <div class="vi-card-title">
+                <i class="bi bi-table"></i>
+                Items
+                <span class="vi-count-badge" id="vi-count-badge">{{ products|length }} item{{ products|length|pluralize }}</span>
+            </div>
+            {% if selected_category %}
+            <span style="font-size:0.6rem;color:#7c3aed;font-family:var(--mono);font-weight:700;margin-left:auto;">
+                {{ selected_category|title }}
+            </span>
+            {% endif %}
+        </div>
+
+        <div class="vi-tbl-wrap">
+            <table class="vi-tbl" id="vi-tbl">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Asset ID</th>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        {% if grouped_view %}<th>Racks &amp; Locations</th>
+                        {% else %}<th>Location</th>{% endif %}
+                        {% endif %}
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        <th>On Hand</th>
+                        <th>On Order</th>
+                        <th>Total</th>
+                        {% endif %}
+                        <th>Price</th>
+                        {% if user.can_edit %}<th class="col-actions">Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody id="vi-tbody">
+                    {% for p in products %}
+                    <tr data-cat="{{ p.category|lower }}"
+                        data-q="{{ p.asset_id|lower }} {{ p.item_code|lower }} {{ p.item_name|lower }}">
+
+                        <!-- Category — plain text -->
+                        <td>{{ p.category }}</td>
+
+                        <!-- Asset ID — mono but plain -->
+                        <td><span class="plain-mono">{{ p.asset_id }}</span></td>
+
+                        <!-- Item code -->
+                        <td><span class="plain-muted">{{ p.item_code|default:"—" }}</span></td>
+
+                        <!-- Item name -->
+                        <td><span class="plain-bold">{{ p.item_name }}</span></td>
+
+                        <!-- Location -->
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        {% if grouped_view %}
+                        <td>
+                            {% for rack in p.racks %}
+                            <div class="plain-muted">{{ rack.location }}</div>
+                            {% endfor %}
+                        </td>
+                        {% else %}
+                        <td><span class="plain-muted">{{ p.computed_location|default:p.location }}</span></td>
+                        {% endif %}
+                        {% endif %}
+
+                        <!-- Quantities — plain numbers -->
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        <td>{{ p.total_quantity }}</td>
+                        <td>{{ p.total_on_order }}</td>
+                        <td>{{ p.total_items }}</td>
+                        {% endif %}
+
+                        <!-- Price — plain -->
+                        <td>{{ p.price|default:"—" }}</td>
+
+                        <!-- Actions — keep styled -->
+                        {% if user.can_edit %}
+                        <td class="col-actions">
+                            <div class="d-flex gap-1 flex-wrap">
+                                {% if grouped_view %}
+                                <a href="{% url 'inventory:edit_product' pk=p.first_product_pk %}" class="btn-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                {% if user.is_stage1 %}
+                                <a href="{% url 'inventory:product_delete_confirm' pk=p.first_product_pk %}" class="btn-del"
+                                   onclick="return confirm('This will delete all locations. Provide a reason.');">
+                                    <i class="bi bi-trash"></i> Delete
+                                </a>
+                                {% endif %}
+                                {% else %}
+                                <a href="{% url 'inventory:edit_product' pk=p.pk %}" class="btn-edit">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                {% if user.is_stage1 %}
+                                <a href="{% url 'inventory:product_delete_confirm' pk=p.pk %}" class="btn-del"
+                                   onclick="return confirm('Provide a reason for deletion.');">
+                                    <i class="bi bi-trash"></i> Delete
+                                </a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr id="vi-empty-row">
+                        <td colspan="10">
+                            <div class="vi-empty">
+                                <i class="bi bi-inbox"></i>
+                                No items found.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function viFilter() {
+        var cat = (document.getElementById('vi-cat') || {}).value || '';
+        var q   = ((document.getElementById('vi-q')  || {}).value || '').toLowerCase().trim();
+        var rows = document.querySelectorAll('#vi-tbody tr:not(#vi-empty-row)');
+        var n = 0;
+        rows.forEach(function(r) {
+            var rc = r.dataset.cat || '';
+            var rq = r.dataset.q   || '';
+            var ok = (!cat || rc.includes(cat.toLowerCase())) && (!q || rq.includes(q));
+            r.classList.toggle('vi-hidden', !ok);
+            if (ok) n++;
+        });
+        var badge  = document.getElementById('vi-count-badge');
+        var badge2 = document.getElementById('vi-badge');
+        var label  = n + ' item' + (n !== 1 ? 's' : '');
+        if (badge)  badge.textContent  = label;
+        if (badge2) badge2.textContent = label;
+        var empty = document.getElementById('vi-empty-row');
+        if (empty) empty.style.display = n === 0 ? '' : 'none';
+    }
+
+    function doPrint() {
+        var cat = document.getElementById('vi-cat');
+        var q   = document.getElementById('vi-q');
+        var catLabel = cat && cat.value ? cat.options[cat.selectedIndex].text : 'All Categories';
+        var qVal     = q ? q.value.trim() : '';
+        var now      = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+        document.getElementById('print-heading').textContent    = catLabel + ' — Inventory Report';
+        var sub = 'Printed: ' + now;
+        if (qVal) sub += '   |   Search: "' + qVal + '"';
+        document.getElementById('print-subheading').textContent = sub;
+        window.print();
+    }
+
+    document.addEventListener('DOMContentLoaded', viFilter);
+</script>
 {% endblock %}

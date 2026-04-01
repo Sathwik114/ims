@@ -10,8 +10,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-in-prod
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
-
+ALLOWED_HOSTS = [
+    '*',
+    '10.40.20.4',
+]
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -53,10 +55,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+# DATABASES = {
+#  'default': {
+#      'ENGINE': 'mssql',
+#      'NAME': 'ims_db',
+#      'USER': 'sa',
+#      'PASSWORD': 'sqlsa@2012',
+#      'HOST': '10.40.20.4',
+#      'PORT': '1433',
+#      'OPTIONS': {
+#          'driver': 'ODBC Driver 17 for SQL Server',
+#      },
+#  }
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    },
+
+    'sqlserver': {
+        'ENGINE': 'mssql',
+        'NAME': 'Payroll',
+        'USER': 'paydev',
+        'PASSWORD': 'dev.gtipay@123',
+        'HOST': '10.40.10.105',
+        'PORT': '',
+        'OPTIONS': {
+            'driver': 'SQL Server',
+        },
     }
 }
 
@@ -77,11 +104,30 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'inventory' / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = 'inventory:login'
-LOGIN_REDIRECT_URL = 'inventory:dashboard'
+LOGIN_REDIRECT_URL = 'inventory:issue_requests'
 LOGOUT_REDIRECT_URL = 'inventory:login'
 
 # Custom: superusers are Stage 1; no category asked during createsuperuser
 AUTH_USER_MODEL = 'inventory.User'
+
+# Email configuration - similar to Next.js mailer settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = '10.40.10.250'  # Same as Next.js
+EMAIL_PORT = 25
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = False
+EMAIL_TIMEOUT = 30
+
+# Email credentials - use environment variables like Next.js
+EMAIL_HOST_USER = os.environ.get('MAIL_USER', 's20330@gti.nws.cn')
+EMAIL_HOST_PASSWORD = os.environ.get('MAIL_PASS', 'SatS2@)#')
+DEFAULT_FROM_EMAIL = os.environ.get('MAIL_USER', 's20330@gti.nws.cn')
+
+# For development, you can also use console backend to test
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

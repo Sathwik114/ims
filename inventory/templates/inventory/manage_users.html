@@ -1,0 +1,74 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Manage Users{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="mb-0">Manage Users</h5>
+        <a href="{% url 'inventory:add_user' %}" class="btn btn-primary btn-sm">
+            <i class="bi bi-person-plus me-1"></i> Add User
+        </a>
+    </div>
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <input type="text" name="q" class="form-control" placeholder="Search by username or name" value="{{ search }}">
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-outline-primary" type="submit">Search</button>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Full name</th>
+                            <th>Stage</th>
+                            <th>Department | Section</th>
+                            <th>Mobile</th>
+                            <th>Email</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>{{ u.username }}</td>
+                            <td>{{ u.full_name|default:"—" }}</td>
+                            <td>Stage {{ u.stage }}</td>
+                            <td>{{ u.department|default:"—" }} | {{ u.section|default:"—" }}</td>
+                            <td>{{ u.mobile_number|default:"—" }}</td>
+                            <td>{{ u.email|default:"—" }}</td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <form method="post" action="{% url 'inventory:toggle_user_status' user_id=u.id %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm {% if u.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                                            <i class="bi bi-{% if u.is_active %}pause{% else %}play{% endif %}"></i> 
+                                            {% if u.is_active %}Disable{% else %}Enable{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" onsubmit="return confirm('Delete user {{ u.username }}?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <button class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-muted">No users found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

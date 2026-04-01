@@ -1,89 +1,577 @@
 {% extends 'inventory/base.html' %}
 {% block title %}History - {{ category_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  .hi-wrapper {
+    padding: 0.5rem 0 3rem;
+    font-family: var(--font);
+    animation: hiFade 0.4s ease both;
+  }
+  @keyframes hiFade {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* ── Page header ── */
+  .hi-page-head {
+    display: flex; align-items: center; gap: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  .hi-page-icon {
+    width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px;
+    background: linear-gradient(135deg, #fce8ec, #fad8e2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    box-shadow: 0 3px 12px rgba(212,96,122,0.2);
+  }
+  .hi-page-title {
+    font-family: var(--font);
+    font-size: 1.6rem; color: #3d2030; margin: 0; line-height: 1.15;
+    font-weight: 600;
+  }
+  .hi-page-title span { color: #d4607a; font-style: italic; }
+  .hi-page-sub { font-size: 0.78rem; color: #b08090; margin: 0.15rem 0 0; }
+
+  /* ── Filter card ── */
+  .hi-filter-card {
+    background: #fff;
+    border: 1px solid #f2cdd5;
+    border-radius: 18px;
+    padding: 1.1rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 12px rgba(212,96,122,0.06);
+  }
+  .hi-filter-label {
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.09em;
+    text-transform: uppercase; color: #b08090;
+    display: block; margin-bottom: 0.28rem;
+  }
+  .hi-filter-row {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem;
+  }
+  .hi-filter-field { display: flex; flex-direction: column; flex: 1; min-width: 130px; }
+
+  .hi-filter-card input[type="date"],
+  .hi-filter-card select {
+    background: #fff8f9 !important;
+    border: 1.5px solid #f0c8d0 !important;
+    border-radius: 10px !important;
+    padding: 0.52rem 0.85rem !important;
+    font-size: 0.82rem !important;
+    font-family: 'Nunito', sans-serif !important;
+    color: #3d2030 !important;
+    outline: none !important;
+    transition: border-color 0.18s, box-shadow 0.18s !important;
+    width: 100%; -webkit-appearance: none; appearance: none;
+  }
+  .hi-filter-card select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23d4607a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.8rem center !important;
+    padding-right: 2.2rem !important;
+    cursor: pointer;
+  }
+  .hi-filter-card input:focus,
+  .hi-filter-card select:focus {
+    border-color: #e8889a !important;
+    box-shadow: 0 0 0 3px rgba(212,96,122,0.11) !important;
+    background: #fff !important;
+  }
+  .hi-filter-card input:hover,
+  .hi-filter-card select:hover { border-color: #e8a0b0 !important; }
+
+  /* Filter actions */
+  .hi-filter-actions {
+    display: flex; gap: 0.6rem; align-items: flex-end; flex-shrink: 0;
+  }
+  .hi-btn-filter {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: linear-gradient(135deg, #e8889a, #d4607a);
+    color: #fff; border: none; border-radius: 10px;
+    padding: 0.54rem 1.3rem; font-size: 0.82rem; font-weight: 700;
+    font-family: var(--font); cursor: pointer;
+    box-shadow: 0 3px 12px rgba(212,96,122,0.28);
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .hi-btn-filter:hover {
+    background: linear-gradient(135deg, #d4607a, #b8455f);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 18px rgba(212,96,122,0.38);
+  }
+  .hi-btn-pdf {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: #fff; color: #d4607a;
+    border: 1.5px solid #f0c8d0; border-radius: 10px;
+    padding: 0.54rem 1.15rem; font-size: 0.82rem; font-weight: 700;
+    font-family: var(--font); cursor: pointer;
+    text-decoration: none; transition: all 0.2s; white-space: nowrap;
+  }
+  .hi-btn-pdf:hover {
+    background: #fce8ec; border-color: #e8889a; color: #b8455f;
+    transform: translateY(-1px);
+  }
+
+  /* ── Chart card ── */
+  .hi-chart-card {
+    background: #fff;
+    border: 1px solid #f2cdd5;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 12px rgba(212,96,122,0.06);
+  }
+  .hi-stripe {
+    height: 4px;
+    background: linear-gradient(90deg, #f9a8b8, #e8889a, #d4607a, #e8889a, #ffb6c1);
+    background-size: 200%;
+    animation: shimmer 4s linear infinite;
+  }
+  @keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
+
+  .hi-chart-head {
+    padding: 1rem 1.5rem 0.75rem;
+    border-bottom: 1px solid #f5d5dc;
+    background: linear-gradient(to right, #fff8f9, #fff);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  }
+  .hi-chart-head-left { display: flex; align-items: center; gap: 0.65rem; }
+  .hi-chart-icon {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #fce8ec, #fad8e2);
+    display: flex; align-items: center; justify-content: center;
+    color: #d4607a; font-size: 0.85rem;
+  }
+  .hi-chart-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem; color: #3d2030; margin: 0;
+  }
+  .hi-chart-sub { font-size: 0.71rem; color: #b08090; margin: 1px 0 0; }
+
+  .hi-chart-select {
+    background: #fff8f9 !important;
+    border: 1.5px solid #f0c8d0 !important;
+    border-radius: 9px !important;
+    padding: 0.38rem 2rem 0.38rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    font-family: 'Nunito', sans-serif !important;
+    color: #3d2030 !important;
+    outline: none !important;
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23d4607a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.65rem center !important;
+    cursor: pointer;
+    transition: border-color 0.18s;
+  }
+  .hi-chart-select:focus { border-color: #e8889a !important; }
+
+  .hi-chart-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex; justify-content: center;
+  }
+  .hi-chart-body canvas { max-width: 580px; width: 100%; }
+
+  /* ── Table card ── */
+  .hi-table-card {
+    background: #fff;
+    border: 1px solid #f2cdd5;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 3px 16px rgba(212,96,122,0.07), 0 1px 4px rgba(212,96,122,0.04);
+  }
+  .hi-table-toolbar {
+    padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid #f5d5dc;
+    background: linear-gradient(to right, #fff8f9, #fff);
+    display: flex; align-items: center; gap: 0.65rem;
+  }
+  .hi-tbl-icon {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #fce8ec, #fad8e2);
+    display: flex; align-items: center; justify-content: center;
+    color: #d4607a; font-size: 0.85rem;
+  }
+  .hi-tbl-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem; color: #3d2030; margin: 0;
+  }
+  .hi-tbl-count {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 0.32rem;
+    background: #fce8ec; border: 1px solid #f2c0cb;
+    border-radius: 20px; padding: 0.2rem 0.65rem;
+    font-size: 0.67rem; font-weight: 800; color: #d4607a;
+    letter-spacing: 0.07em; text-transform: uppercase;
+  }
+  .hi-tbl-count::before {
+    content:''; width:5px; height:5px; border-radius:50%;
+    background:#d4607a; box-shadow:0 0 5px #d4607a;
+  }
+
+  /* Scroll area */
+  .hi-table-scroll { max-height: 460px; overflow-y: auto; }
+  .hi-table-scroll::-webkit-scrollbar { width: 5px; }
+  .hi-table-scroll::-webkit-scrollbar-track { background: #fff5f7; }
+  .hi-table-scroll::-webkit-scrollbar-thumb { background: #f0c8d0; border-radius: 3px; }
+  .hi-table-scroll::-webkit-scrollbar-thumb:hover { background: #e8889a; }
+
+  /* Table */
+  .hi-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  .hi-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #fff5f7 !important;
+    color: #d4607a !important;
+    font-size: 0.66rem; font-weight: 800;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid #f5d5dc;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .hi-table tbody tr {
+    border-bottom: 1px solid #fce8ee;
+    transition: background 0.12s;
+  }
+  .hi-table tbody tr:last-child { border-bottom: none; }
+  .hi-table tbody tr:hover td { background: #fff5f7 !important; }
+  .hi-table td {
+    padding: 0.78rem 1rem;
+    color: #3d2030; vertical-align: middle;
+  }
+
+  /* Cell chips */
+  .hi-date-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: #7a4a58; white-space: nowrap;
+  }
+  .hi-date-time { font-size: 0.68rem; color: #b08090; margin-top: 1px; }
+
+  .hi-asset-chip {
+    display: inline-flex; align-items: center;
+    background: #fff0f3; border: 1px solid #f2c0cb;
+    border-radius: 7px; padding: 0.18rem 0.55rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; font-weight: 500; color: #b8455f;
+  }
+  .hi-item-name { font-weight: 700; color: #3d2030; }
+
+  .hi-receiver-name { font-weight: 700; color: #3d2030; font-size: 0.82rem; }
+  .hi-receiver-sub { font-size: 0.7rem; color: #b08090; margin-top: 1px; }
+
+  .hi-qty-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; height: 26px;
+    background: #fce8ec; border: 1px solid #f2c0cb;
+    border-radius: 7px; padding: 0 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; font-weight: 700; color: #b8455f;
+  }
+  .hi-price { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #7a4a58; }
+  .hi-cost  { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: #2e7a56; }
+
+  .hi-user-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: #f5f5ff; border: 1px solid #ddddf5;
+    border-radius: 7px; padding: 0.18rem 0.5rem;
+    font-size: 0.72rem; font-weight: 600; color: #5a5ab8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .hi-dash { color: #b08090; font-size: 1.1rem; }
+
+  /* Location info styling */
+  .hi-location-info {
+    line-height: 1.2;
+  }
+  .hi-dept {
+    font-weight: 600;
+    color: #3d2030;
+    font-size: 0.75rem;
+  }
+  .hi-section {
+    color: #b08090;
+    font-size: 0.65rem;
+    margin-top: 1px;
+  }
+  .hi-location-info.small .hi-dept {
+    font-size: 0.7rem;
+  }
+  .hi-location-info.small .hi-section {
+    font-size: 0.6rem;
+  }
+
+  /* Empty */
+  .hi-empty {
+    text-align: center; padding: 3.5rem 1rem;
+  }
+  .hi-empty-icon { font-size: 2.5rem; opacity: 0.45; margin-bottom: 0.75rem; }
+  .hi-empty-text { font-size: 0.88rem; color: #b08090; font-weight: 700; }
+  .hi-empty-sub  { font-size: 0.75rem; color: #d4a8b4; margin-top: 0.3rem; }
+
+  @media (max-width: 700px) {
+    .hi-filter-field { min-width: 110px; }
+    .hi-page-title { font-size: 1.3rem; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">History (Issued items) — {{ category_name }}</h5>
-    <form method="get" class="row g-2 mb-3">
-        <div class="col-auto">
-            <input type="date" name="from" class="form-control" value="{{ from_date }}" placeholder="From">
-        </div>
-        <div class="col-auto">
-            <input type="date" name="to" class="form-control" value="{{ to_date }}" placeholder="To">
-        </div>
-        <div class="col-auto">
-            <input type="date" name="date" class="form-control" value="{{ search_date }}" placeholder="Date">
-        </div>
-        <div class="col-auto">
-            <select name="day" class="form-select">
-                <option value="">All days</option>
-                <option value="1" {% if search_day == "1" %}selected{% endif %}>Sunday</option>
-                <option value="2" {% if search_day == "2" %}selected{% endif %}>Monday</option>
-                <option value="3" {% if search_day == "3" %}selected{% endif %}>Tuesday</option>
-                <option value="4" {% if search_day == "4" %}selected{% endif %}>Wednesday</option>
-                <option value="5" {% if search_day == "5" %}selected{% endif %}>Thursday</option>
-                <option value="6" {% if search_day == "6" %}selected{% endif %}>Friday</option>
-                <option value="7" {% if search_day == "7" %}selected{% endif %}>Saturday</option>
-            </select>
-        </div>
-        <div class="col-auto">
-            <select name="month" class="form-select">
-                <option value="">All months</option>
-                <option value="1" {% if search_month == "1" %}selected{% endif %}>January</option>
-                <option value="2" {% if search_month == "2" %}selected{% endif %}>February</option>
-                <option value="3" {% if search_month == "3" %}selected{% endif %}>March</option>
-                <option value="4" {% if search_month == "4" %}selected{% endif %}>April</option>
-                <option value="5" {% if search_month == "5" %}selected{% endif %}>May</option>
-                <option value="6" {% if search_month == "6" %}selected{% endif %}>June</option>
-                <option value="7" {% if search_month == "7" %}selected{% endif %}>July</option>
-                <option value="8" {% if search_month == "8" %}selected{% endif %}>August</option>
-                <option value="9" {% if search_month == "9" %}selected{% endif %}>September</option>
-                <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
-                <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
-                <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
-            </select>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Filter</button>
-        </div>
-        <div class="col-auto">
-            <a href="{% url 'inventory:issue_history_pdf' category=category %}?from={{ from_date }}&to={{ to_date }}&date={{ search_date }}&day={{ search_day }}&month={{ search_month }}" class="btn btn-outline-primary">Download PDF</a>
-        </div>
-    </form>
-    <div class="card">
-        <div class="card-body">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>Date &amp; time</th>
-                        <th>Asset ID</th>
-                        <th>Item</th>
-                        <th>Receiver</th>
-                        <th>Quantity</th>
-                        <th>Unit price</th>
-                        <th>Total cost</th>
-                        <th>Approved by</th>
-                        <th>Issued by</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in records %}
-                    <tr>
-                        <td>{{ r.issued_at|date:"Y-m-d H:i" }}</td>
-                        <td>{{ r.product.asset_id }}</td>
-                        <td>{{ r.product.item_name }}</td>
-                        <td>{{ r.receiver.username|default:"-" }}{% if r.receiver_full_name %}<br><span class="text-muted small">{{ r.receiver_full_name }}</span>{% endif %}{% if r.receiver_mobile %}<br><span class="text-muted small">{{ r.receiver_mobile }}</span>{% endif %}</td>
-                        <td>{{ r.quantity }}</td>
-                        <td>{{ r.unit_price|default:"-" }}</td>
-                        <td>{{ r.total_cost|default:"-" }}</td>
-                        <td>{{ r.approved_by.username|default:"-" }}</td>
-                        <td>{{ r.issued_by.username|default:"-" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="9" class="text-muted">No issue history.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="hi-wrapper">
+
+  <!-- ── Page header ── -->
+  <div class="hi-page-head">
+    <div class="hi-page-icon">📋</div>
+    <div>
+      <h1 class="hi-page-title">Issued History — <span>{{ category_name }}</span></h1>
+      <p class="hi-page-sub">Browse and filter all issued item records for this category</p>
     </div>
+  </div>
+
+  <!-- ── Filter card ── -->
+  <form method="get" class="hi-filter-card">
+    <div class="hi-filter-row">
+      <div class="hi-filter-field">
+        <span class="hi-filter-label">From date</span>
+        <input type="date" name="from" value="{{ from_date }}">
+      </div>
+      <div class="hi-filter-field">
+        <span class="hi-filter-label">To date</span>
+        <input type="date" name="to" value="{{ to_date }}">
+      </div>
+      <div class="hi-filter-field">
+        <span class="hi-filter-label">Exact date</span>
+        <input type="date" name="date" value="{{ search_date }}">
+      </div>
+      <div class="hi-filter-field">
+        <span class="hi-filter-label">Day of week</span>
+        <select name="day">
+          <option value="">All days</option>
+          <option value="1" {% if search_day == "1" %}selected{% endif %}>Sunday</option>
+          <option value="2" {% if search_day == "2" %}selected{% endif %}>Monday</option>
+          <option value="3" {% if search_day == "3" %}selected{% endif %}>Tuesday</option>
+          <option value="4" {% if search_day == "4" %}selected{% endif %}>Wednesday</option>
+          <option value="5" {% if search_day == "5" %}selected{% endif %}>Thursday</option>
+          <option value="6" {% if search_day == "6" %}selected{% endif %}>Friday</option>
+          <option value="7" {% if search_day == "7" %}selected{% endif %}>Saturday</option>
+        </select>
+      </div>
+      <div class="hi-filter-field">
+        <span class="hi-filter-label">Month</span>
+        <select name="month">
+          <option value="">All months</option>
+          <option value="1"  {% if search_month == "1"  %}selected{% endif %}>January</option>
+          <option value="2"  {% if search_month == "2"  %}selected{% endif %}>February</option>
+          <option value="3"  {% if search_month == "3"  %}selected{% endif %}>March</option>
+          <option value="4"  {% if search_month == "4"  %}selected{% endif %}>April</option>
+          <option value="5"  {% if search_month == "5"  %}selected{% endif %}>May</option>
+          <option value="6"  {% if search_month == "6"  %}selected{% endif %}>June</option>
+          <option value="7"  {% if search_month == "7"  %}selected{% endif %}>July</option>
+          <option value="8"  {% if search_month == "8"  %}selected{% endif %}>August</option>
+          <option value="9"  {% if search_month == "9"  %}selected{% endif %}>September</option>
+          <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
+          <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
+          <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
+        </select>
+      </div>
+      <div class="hi-filter-actions">
+        <button type="submit" class="hi-btn-filter">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+        <a href="{% url 'inventory:issue_history_pdf' category=category %}?from={{ from_date }}&to={{ to_date }}&date={{ search_date }}&day={{ search_day }}&month={{ search_month }}"
+           class="hi-btn-pdf">
+          <i class="bi bi-file-earmark-pdf"></i> PDF
+        </a>
+      </div>
+    </div>
+  </form>
+
+  <!-- ── Chart card ── -->
+  <div class="hi-chart-card">
+    <div class="hi-stripe"></div>
+    <div class="hi-chart-head">
+      <div class="hi-chart-head-left">
+        <div class="hi-chart-icon"><i class="bi bi-bar-chart"></i></div>
+        <div>
+          <p class="hi-chart-title">Visual Summary</p>
+          <p class="hi-chart-sub">Issued quantity — {{ category_name }}</p>
+        </div>
+      </div>
+      <select id="historyChartSelect" class="hi-chart-select">
+        <option value="by_category">By category</option>
+        <option value="top_items">Top items</option>
+      </select>
+    </div>
+    <div class="hi-chart-body">
+      <canvas id="historyChart" height="150"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Completed Requests (Confirmed) Table ── -->
+  {% if confirmed_requests %}
+  <div class="hi-table-card">
+    <div class="hi-stripe"></div>
+    <div class="hi-table-toolbar">
+      <div class="hi-tbl-icon"><i class="bi bi-check-circle"></i></div>
+      <p class="hi-tbl-title">Completed Requests (Confirmed)</p>
+      <span class="hi-tbl-count">{{ confirmed_requests|length }} request{{ confirmed_requests|length|pluralize }}</span>
+    </div>
+
+    <div class="hi-table-scroll">
+      <table class="hi-table">
+        <thead>
+          <tr>
+            <th>Requested Date/Time</th>
+            <th>Asset ID</th>
+            <th>Item Name</th>
+            <th>User Dept|Section</th>
+            <th>User</th>
+            <th>Mobile</th>
+            <th>Quantity</th>
+            <th>Reason for Request</th>
+            <th>Status</th>
+            <th>Approved By</th>
+            <th>Rejected By</th>
+            <th>Reject Reason</th>
+            <th>Issued By</th>
+            <th>Confirmed By</th>
+            <th>Confirmed DateTime</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in confirmed_requests %}
+          <tr>
+            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ ir.product.asset_id }}</td>
+            <td>{{ ir.product.item_name }}</td>
+            <td>
+              {% if ir.requested_by_department %}
+                {{ ir.get_requested_by_department_display }}<br>
+                <span class="text-muted small">{{ ir.get_requested_by_section_display|default:"-" }}</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
+            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
+            <td>{{ ir.approved_quantity|default:ir.quantity }}</td>
+            <td>{{ ir.request_reason|default:"-" }}</td>
+            <td>
+              <span class="badge bg-{{ 
+                'secondary' if ir.status == 'pending' else
+                'success' if ir.status == 'approved' else
+                'primary' if ir.status == 'issued' else
+                'info' if ir.status == 'confirmed' else
+                'danger'
+              }}">
+                {{ ir.get_status_display }}
+              </span>
+            </td>
+            <td>
+              {{ ir.approved_by.username|default:"-" }}
+              {% if ir.approved_by_full_name %}<br><span class="text-muted small">{{ ir.approved_by_full_name }}</span>{% endif %}
+            </td>
+            <td>
+              {{ ir.rejected_by.username|default:"-" }}
+              {% if ir.rejected_by_full_name %}<br><span class="text-muted small">{{ ir.rejected_by_full_name }}</span>{% endif %}
+            </td>
+            <td>{{ ir.rejection_reason|default:"-" }}</td>
+            <td>
+              {{ ir.issued_by.username|default:"-" }}
+              {% if ir.issued_by_full_name %}<br><span class="text-muted small">{{ ir.issued_by_full_name }}</span>{% endif %}
+            </td>
+            <td>
+              {{ ir.confirmed_by.username|default:"-" }}
+              {% if ir.confirmed_by_full_name %}<br><span class="text-muted small">{{ ir.confirmed_by_full_name }}</span>{% endif %}
+            </td>
+            <td class="text-muted small">{{ ir.confirmed_at|date:"Y-m-d H:i"|default:"-" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="15" class="text-muted">No completed requests yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const chartsData = {{ charts_json|safe }};
+  const ctx = document.getElementById('historyChart');
+  if (!ctx || !chartsData) return;
+
+  const PALETTE = [
+    '#d4607a','#e8889a','#f5c8d4',
+    '#b8455f','#c97a95','#f0aabb',
+    '#9e3050','#e0a0b0'
+  ];
+
+  function makeConfig(kind) {
+    const series = chartsData[kind] || [];
+    return {
+      type: 'bar',
+      data: {
+        labels: series.map(s => s.label),
+        datasets: [{
+          data: series.map(s => s.value),
+          backgroundColor: PALETTE,
+          borderRadius: 8,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#ffffff',
+            borderColor: '#f2cdd5',
+            borderWidth: 1,
+            titleColor: '#3d2030',
+            bodyColor: '#b08090',
+            titleFont: { family: 'Nunito', weight: '700' },
+            bodyFont:  { family: 'Nunito' },
+            padding: 10,
+            cornerRadius: 10,
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: '#b08090',
+              font: { family: 'Nunito', size: 11 }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: '#fce8ee' },
+            ticks: {
+              precision: 0,
+              color: '#b08090',
+              font: { family: 'JetBrains Mono', size: 11 }
+            }
+          }
+        }
+      }
+    };
+  }
+
+  let currentKind = 'by_category';
+  let chart = new Chart(ctx, makeConfig(currentKind));
+
+  document.getElementById('historyChartSelect').addEventListener('change', function(e) {
+    currentKind = e.target.value;
+    chart.destroy();
+    chart = new Chart(ctx, makeConfig(currentKind));
+  });
+})();
+</script>
 {% endblock %}

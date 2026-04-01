@@ -1,41 +1,392 @@
 {% extends 'inventory/base.html' %}
 {% block title %}Add User{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       LAYOUT — centered on page
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .au-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        min-height: calc(100vh - 120px);
+        padding: 2rem 1rem;
+    }
+    .au-inner {
+        width: 100%;
+        max-width: 720px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PAGE HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .au-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .au-top-left { display: flex; align-items: center; gap: 0.65rem; }
+    .au-icon {
+        width: 38px; height: 38px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #7c3aed, #4c6ef5);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 1rem; flex-shrink: 0;
+        box-shadow: 0 3px 10px rgba(124,58,237,0.28);
+    }
+    .au-top-left h5 {
+        font-size: 1.05rem; font-weight: 800; color: #1e2035;
+        margin: 0 0 0.1rem; letter-spacing: -0.02em;
+    }
+    .au-top-left p { font-size: 0.68rem; color: #6b7490; font-family: var(--mono); margin: 0; }
+    .au-breadcrumb {
+        display: flex; align-items: center; gap: 0.35rem;
+        font-size: 0.7rem; font-family: var(--mono);
+        background: #fff; border: 1px solid rgba(200,205,225,0.8);
+        border-radius: 8px; padding: 0.3rem 0.75rem; color: #6b7490;
+    }
+    .au-breadcrumb a { color: #7c3aed; text-decoration: none; font-weight: 700; }
+    .au-breadcrumb a:hover { text-decoration: underline; }
+    .au-breadcrumb .sep { color: #c4b5fd; font-size: 0.6rem; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       FORM CARD
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .au-card {
+        background: #fff;
+        border: 2px solid #7c3aed;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(124,58,237,0.18), 0 1px 6px rgba(124,58,237,0.10);
+        overflow: hidden;
+    }
+
+    /* Dark blue header — white text */
+    .au-card-head {
+        display: flex; align-items: center; gap: 0.45rem;
+        padding: 0.6rem 1rem;
+        border-bottom: 2px solid #6d28d9;
+        background: #1f0b42;
+    }
+    .au-card-head-title {
+        font-size: 0.74rem; font-weight: 700; color: #ffffff;
+        display: flex; align-items: center; gap: 0.4rem;
+        font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .au-card-head-title i { color: #a78bfa; font-size: 0.78rem; }
+    .au-stage-pill {
+        margin-left: auto;
+        font-family: var(--mono); font-size: 0.56rem; font-weight: 700;
+        background: rgba(255,255,255,0.10); color: #e9d5ff;
+        border: 1px solid rgba(167,139,250,0.35); border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        display: inline-flex; align-items: center; gap: 0.3rem; letter-spacing: 0.05em;
+    }
+    .au-stage-pill::before {
+        content: ''; width: 5px; height: 5px; border-radius: 50%;
+        background: #a78bfa; box-shadow: 0 0 5px rgba(167,139,250,0.7);
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       CARD BODY
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .au-card-body { padding: 1.25rem 1.5rem 1.5rem; }
+
+    /* Section divider */
+    .au-sec {
+        display: flex; align-items: center; gap: 0.5rem;
+        margin: 1.25rem 0 0.85rem;
+    }
+    .au-sec:first-child { margin-top: 0; }
+    .au-sec-icon {
+        width: 22px; height: 22px; border-radius: 6px;
+        background: #f0ebff; display: flex; align-items: center; justify-content: center;
+        font-size: 0.72rem; color: #7c3aed; flex-shrink: 0;
+    }
+    .au-sec-label {
+        font-size: 0.58rem; font-weight: 700; letter-spacing: 0.1em;
+        text-transform: uppercase; color: #7c3aed;
+        font-family: var(--mono); white-space: nowrap;
+    }
+    .au-sec-rule {
+        flex: 1; height: 1px;
+        background: linear-gradient(to right, rgba(124,58,237,0.2), transparent);
+    }
+
+    /* Fields in a horizontal row */
+    .au-row {
+        display: flex;
+        gap: 0.85rem;
+        flex-wrap: wrap;
+    }
+    .au-row .au-field { flex: 1; min-width: 140px; }
+
+    .au-field { display: flex; flex-direction: column; gap: 0.28rem; }
+    .au-label {
+        font-size: 0.62rem; font-weight: 700; color: #5b21b6;
+        letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono);
+    }
+    .au-hint-txt {
+        font-size: 0.62rem; color: #9090b0; font-family: var(--mono); margin-top: 0.15rem;
+    }
+
+    /* Inputs */
+    .au-card-body input,
+    .au-card-body select {
+        width: 100% !important; height: 34px !important;
+        background: #fafbff !important;
+        border: 1px solid rgba(180,140,220,0.3) !important;
+        border-radius: 7px !important; color: #1e2035 !important;
+        padding: 0 0.75rem !important; font-size: 0.78rem !important;
+        font-family: var(--font) !important; font-weight: 400 !important;
+        outline: none !important;
+        transition: border 0.15s, box-shadow 0.15s, background 0.15s !important;
+        -webkit-appearance: none; appearance: none; box-sizing: border-box !important;
+    }
+    .au-card-body input::placeholder { color: #b0b8d0 !important; font-size: 0.75rem !important; }
+    .au-card-body input:focus,
+    .au-card-body select:focus {
+        border-color: #7c3aed !important;
+        box-shadow: 0 0 0 2.5px rgba(124,58,237,0.10) !important;
+        background: #ffffff !important;
+    }
+    .au-card-body input:hover,
+    .au-card-body select:hover { border-color: rgba(124,58,237,0.4) !important; }
+    .au-card-body select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237c3aed' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        padding-right: 2.2rem !important; cursor: pointer;
+    }
+
+    /* Error */
+    .au-error {
+        font-size: 0.62rem; color: #dc2626; font-family: var(--mono);
+        font-weight: 700; margin-top: 0.1rem;
+        display: flex; align-items: center; gap: 0.3rem;
+    }
+    .au-error::before { content: '⚠ '; }
+
+    /* Divider */
+    .au-divider {
+        height: 1px; margin: 1.25rem 0;
+        background: linear-gradient(to right, transparent, rgba(124,58,237,0.2), transparent);
+    }
+
+    /* Actions */
+    .au-actions { display: flex; align-items: center; gap: 0.65rem; }
+    .au-btn-submit {
+        display: inline-flex; align-items: center; gap: 0.45rem;
+        background: #1f0b42; color: #fff; border: none;
+        border-radius: 8px; padding: 0.55rem 1.4rem;
+        font-size: 0.78rem; font-weight: 700; font-family: var(--mono);
+        cursor: pointer; letter-spacing: 0.03em;
+        transition: background 0.18s, box-shadow 0.18s, transform 0.15s;
+        box-shadow: 0 3px 10px rgba(31,11,66,0.22);
+    }
+    .au-btn-submit:hover {
+        background: #2d1260; transform: translateY(-1px);
+        box-shadow: 0 5px 16px rgba(124,58,237,0.28); color: #fff;
+    }
+    .au-btn-submit:active { transform: translateY(0); }
+    .au-btn-cancel {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: transparent; color: #6b7490;
+        border: 1px solid rgba(200,205,225,0.8); border-radius: 8px;
+        padding: 0.55rem 1.1rem; font-size: 0.78rem; font-weight: 600;
+        font-family: var(--mono); text-decoration: none; cursor: pointer;
+        transition: all 0.18s;
+    }
+    .au-btn-cancel:hover { color: #7c3aed; border-color: rgba(124,58,237,0.35); background: #f5f3ff; }
+
+    /* Info note */
+    .au-note {
+        display: flex; align-items: flex-start; gap: 0.5rem;
+        margin-top: 1rem; padding: 0.6rem 0.85rem;
+        background: #f5f3ff; border: 1px solid rgba(124,58,237,0.18);
+        border-radius: 9px; font-size: 0.68rem; color: #5b21b6;
+        font-family: var(--mono); line-height: 1.6;
+    }
+    .au-note i { flex-shrink: 0; margin-top: 1px; color: #7c3aed; }
+
+    @media (max-width: 540px) { .au-row { flex-direction: column; } }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">Add User (Stage 2 or Stage 3)</h5>
-    <div class="card" style="max-width: 520px;">
-        <div class="card-body">
+<div class="au-wrap">
+<div class="au-inner">
+
+    <!-- Header -->
+    <div class="au-top">
+        <div class="au-top-left">
+            <div class="au-icon"><i class="bi bi-person-plus"></i></div>
+            <div>
+                <h5>Add User</h5>
+                <p>Register a new Stage 1 / 2 / 3 member</p>
+            </div>
+        </div>
+        <div class="au-breadcrumb">
+            <a href="{% url 'inventory:profile' %}"><i class="bi bi-person-circle" style="font-size:0.6rem;"></i> Profile</a>
+            <span class="sep">›</span>
+            <span>Add User</span>
+        </div>
+    </div>
+
+    <!-- Card -->
+    <div class="au-card">
+
+        <!-- Dark blue header, white text -->
+        <div class="au-card-head">
+            <div class="au-card-head-title">
+                <i class="bi bi-person-plus"></i>
+                User Registration
+            </div>
+            <span class="au-stage-pill">Stage 1 / 2 / 3</span>
+        </div>
+
+        <div class="au-card-body">
             <form method="post">
                 {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    {{ form.username }}
-                    {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors.0 }}</div>{% endif %}
+
+                <!-- ── Account Credentials row ── -->
+                <div class="au-sec">
+                    <div class="au-sec-icon"><i class="bi bi-key"></i></div>
+                    <span class="au-sec-label">Account Credentials</span>
+                    <div class="au-sec-rule"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Password</label>
-                    {{ form.password }}
+                <div class="au-row">
+                    <div class="au-field">
+                        <label class="au-label">Username</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                        <div class="au-error">{{ form.username.errors.0 }}</div>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Stage</label>
-                    {{ form.stage }}
+
+                <!-- ── Role row ── -->
+                <div class="au-sec">
+                    <div class="au-sec-icon"><i class="bi bi-shield"></i></div>
+                    <span class="au-sec-label">Role</span>
+                    <div class="au-sec-rule"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    {{ form.email }}
+                <div class="au-row">
+                    <div class="au-field">
+                        <label class="au-label">Stage</label>
+                        {{ form.stage }}
+                    </div>
+                    <div class="au-field">
+                        <label class="au-label">Department</label>
+                        {{ form.department }}
+                        <span class="au-hint-txt">Select department</span>
+                    </div>
+                    <div class="au-field">
+                        <label class="au-label">Section</label>
+                        {{ form.section }}
+                        <span class="au-hint-txt">Select section</span>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Full name</label>
-                    {{ form.full_name }}
+
+                <!-- ── Personal Details row ── -->
+                <div class="au-sec">
+                    <div class="au-sec-icon"><i class="bi bi-person"></i></div>
+                    <span class="au-sec-label">Personal Details</span>
+                    <div class="au-sec-rule"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Mobile number</label>
-                    {{ form.mobile_number }}
+                <div class="au-row">
+                    <div class="au-field">
+                        <label class="au-label">Full Name</label>
+                        {{ form.full_name }}
+                        {% if form.full_name.errors %}
+                        <div class="au-error">{{ form.full_name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="au-field">
+                        <label class="au-label">Email</label>
+                        {{ form.email }}
+                    </div>
+                    <div class="au-field">
+                        <label class="au-label">Mobile Number</label>
+                        {{ form.mobile_number }}
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Create user</button>
-                <a href="{% url 'inventory:profile' %}" class="btn btn-outline-secondary">Cancel</a>
+
+                <div class="au-divider"></div>
+
+                <!-- Actions -->
+                <div class="au-actions">
+                    <button type="submit" class="au-btn-submit">
+                        <i class="bi bi-person-check"></i> Create User
+                    </button>
+                    <a href="{% url 'inventory:profile' %}" class="au-btn-cancel">
+                        <i class="bi bi-x"></i> Cancel
+                    </a>
+                </div>
+
+                <div class="au-note">
+                    <i class="bi bi-info-circle"></i>
+                    <span>
+                        <strong>Stage 2</strong> users can manage inventory operations.
+                        <strong>Stage 3</strong> users have request-only access.
+                        Choose the correct role before creating.
+                    </span>
+                </div>
+
             </form>
         </div>
     </div>
-</div>
+
+</div><!-- /au-inner -->
+</div><!-- /au-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const usernameField   = document.getElementById('{{ form.username.id_for_label }}');
+        const emailField      = document.getElementById('{{ form.email.id_for_label }}');
+        const departmentField = document.getElementById('{{ form.department.id_for_label }}');
+        const sectionField    = document.getElementById('{{ form.section.id_for_label }}');
+
+        if (usernameField && emailField) {
+            usernameField.addEventListener('input', function () {
+                const username = this.value.trim();
+                emailField.value = username ? username + '@gti.nws.cn' : '';
+                fetchUserData(username);
+            });
+        }
+
+        let fetchTimeout;
+        function fetchUserData(username) {
+            if (!username) return;
+            clearTimeout(fetchTimeout);
+            fetchTimeout = setTimeout(() => {
+                if (departmentField) departmentField.value = 'Fetching...';
+                if (sectionField)    sectionField.value    = 'Fetching...';
+                fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const fullNameField = document.getElementById('{{ form.full_name.id_for_label }}');
+                        const mobileField   = document.getElementById('{{ form.mobile_number.id_for_label }}');
+                        if (data.full_name     && fullNameField)  fullNameField.value  = data.full_name;
+                        if (departmentField)   departmentField.value = data.department || '';
+                        if (sectionField)      sectionField.value    = data.section    || '';
+                        if (data.mobile_number && mobileField)   mobileField.value    = data.mobile_number;
+                    })
+                    .catch(() => {
+                        if (departmentField && departmentField.value === 'Fetching...') departmentField.value = '';
+                        if (sectionField    && sectionField.value    === 'Fetching...') sectionField.value    = '';
+                    });
+            }, 800);
+        }
+    });
+</script>
 {% endblock %}

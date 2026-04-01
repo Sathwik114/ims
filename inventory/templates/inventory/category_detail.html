@@ -1,56 +1,406 @@
 {% extends 'inventory/base.html' %}
 {% block title %}{{ category_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  .cd-wrapper {
+    padding: 0.5rem 0 3rem;
+    font-family: 'Nunito', sans-serif;
+    animation: cdFade 0.4s ease both;
+  }
+  @keyframes cdFade {
+    from { opacity:0; transform:translateY(12px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* ── Page header ── */
+  .cd-page-head {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .cd-page-left { display: flex; align-items: center; gap: 0.9rem; }
+  .cd-page-icon {
+    width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px;
+    background: linear-gradient(135deg, #fce8ec, #fad8e2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 3px 12px rgba(212,96,122,0.2);
+  }
+  .cd-page-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem; color: #3d2030; margin: 0; line-height: 1.15;
+  }
+  .cd-page-title span { color: #d4607a; font-style: italic; }
+  .cd-page-sub { font-size: 0.78rem; color: #b08090; margin: 0.15rem 0 0; }
+
+  /* ── Search bar card ── */
+  .cd-search-card {
+    background: #fff;
+    border: 1px solid #f2cdd5;
+    border-radius: 18px;
+    padding: 1.1rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 12px rgba(212,96,122,0.06);
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem;
+  }
+  .cd-search-field {
+    display: flex; flex-direction: column; gap: 0.28rem;
+    flex: 1; min-width: 150px;
+  }
+  .cd-search-label {
+    font-size: 0.65rem; font-weight: 800; letter-spacing: 0.09em;
+    text-transform: uppercase; color: #b08090;
+  }
+  .cd-search-card input[type="text"] {
+    background: #fff8f9 !important;
+    border: 1.5px solid #f0c8d0 !important;
+    border-radius: 10px !important;
+    padding: 0.52rem 0.85rem !important;
+    font-size: 0.82rem !important;
+    font-family: 'Nunito', sans-serif !important;
+    color: #3d2030 !important;
+    outline: none !important;
+    transition: border-color 0.18s, box-shadow 0.18s !important;
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  .cd-search-card input[type="text"]::placeholder { color: #d4a8b4 !important; }
+  .cd-search-card input[type="text"]:focus {
+    border-color: #e8889a !important;
+    box-shadow: 0 0 0 3px rgba(212,96,122,0.11) !important;
+    background: #fff !important;
+  }
+  .cd-search-card input[type="text"]:hover {
+    border-color: #e8a0b0 !important;
+  }
+  .cd-btn-search {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    background: linear-gradient(135deg, #e8889a, #d4607a);
+    color: #fff; border: none; border-radius: 10px;
+    padding: 0.56rem 1.4rem; font-size: 0.82rem; font-weight: 700;
+    font-family: 'Nunito', sans-serif; cursor: pointer;
+    box-shadow: 0 3px 12px rgba(212,96,122,0.28);
+    transition: all 0.2s; white-space: nowrap; align-self: flex-end;
+  }
+  .cd-btn-search:hover {
+    background: linear-gradient(135deg, #d4607a, #b8455f);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 18px rgba(212,96,122,0.38);
+  }
+  .cd-btn-search:active { transform: translateY(0); }
+
+  /* ── Table card ── */
+  .cd-table-card {
+    background: #fff;
+    border: 1px solid #f2cdd5;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 3px 16px rgba(212,96,122,0.07), 0 1px 4px rgba(212,96,122,0.04);
+  }
+
+  /* Shimmer stripe */
+  .cd-stripe {
+    height: 4px;
+    background: linear-gradient(90deg, #f9a8b8, #e8889a, #d4607a, #e8889a, #ffb6c1);
+    background-size: 200%;
+    animation: shimmer 4s linear infinite;
+  }
+  @keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
+
+  /* Table toolbar */
+  .cd-table-toolbar {
+    padding: 0.9rem 1.4rem;
+    border-bottom: 1px solid #f5d5dc;
+    background: linear-gradient(to right, #fff8f9, #fff);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cd-toolbar-left { display: flex; align-items: center; gap: 0.65rem; }
+  .cd-tbl-icon {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #fce8ec, #fad8e2);
+    display: flex; align-items: center; justify-content: center;
+    color: #d4607a; font-size: 0.85rem;
+  }
+  .cd-tbl-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem; color: #3d2030; margin: 0;
+  }
+  .cd-tbl-count {
+    display: inline-flex; align-items: center; gap: 0.32rem;
+    background: #fce8ec; border: 1px solid #f2c0cb;
+    border-radius: 20px; padding: 0.2rem 0.65rem;
+    font-size: 0.67rem; font-weight: 800; color: #d4607a;
+    letter-spacing: 0.07em; text-transform: uppercase;
+  }
+  .cd-tbl-count::before {
+    content:''; width:5px; height:5px; border-radius:50%;
+    background:#d4607a; box-shadow:0 0 5px #d4607a;
+  }
+
+  /* Table scroll area */
+  .cd-table-scroll {
+    max-height: 460px;
+    overflow-y: auto;
+  }
+  .cd-table-scroll::-webkit-scrollbar { width: 5px; }
+  .cd-table-scroll::-webkit-scrollbar-track { background: #fff5f7; }
+  .cd-table-scroll::-webkit-scrollbar-thumb { background: #f0c8d0; border-radius: 3px; }
+  .cd-table-scroll::-webkit-scrollbar-thumb:hover { background: #e8889a; }
+
+  /* Table styles */
+  .cd-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+
+  .cd-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #fff5f7 !important;
+    color: #d4607a !important;
+    font-size: 0.67rem; font-weight: 800;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 2px solid #f5d5dc !important;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .cd-table tbody tr {
+    border-bottom: 1px solid #fce8ee;
+    transition: background 0.13s;
+  }
+  .cd-table tbody tr:last-child { border-bottom: none; }
+  .cd-table tbody tr:hover td { background: #fff5f7 !important; }
+
+  .cd-table td {
+    padding: 0.78rem 1.1rem;
+    color: #3d2030;
+    vertical-align: middle;
+  }
+
+  /* Asset ID chip */
+  .cd-asset-chip {
+    display: inline-flex; align-items: center;
+    background: #fff0f3; border: 1px solid #f2c0cb;
+    border-radius: 7px; padding: 0.18rem 0.55rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; font-weight: 500; color: #b8455f;
+    white-space: nowrap;
+  }
+
+  /* Item code chip */
+  .cd-code-chip {
+    display: inline-flex; align-items: center;
+    background: #f5f0ff; border: 1px solid #ddd0f5;
+    border-radius: 7px; padding: 0.18rem 0.55rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; font-weight: 500; color: #7a5ab8;
+    white-space: nowrap;
+  }
+
+  /* Item name */
+  .cd-item-name { font-weight: 700; color: #3d2030; }
+  .cd-item-sub  { font-size: 0.72rem; color: #b08090; margin-top: 1px; }
+
+  /* Location */
+  .cd-location {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.76rem; color: #7a4a58;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cd-location i { color: #d4607a; font-size: 0.65rem; }
+
+  /* Quantity cell */
+  .cd-qty { display: flex; align-items: center; gap: 0.45rem; }
+  .cd-qty-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem; font-weight: 700; color: #3d2030;
+  }
+  .cd-badge-low {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: #fff3e0; border: 1px solid #ffd494;
+    border-radius: 6px; padding: 0.1rem 0.45rem;
+    font-size: 0.64rem; font-weight: 800; color: #c97a20;
+    text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .cd-badge-low i { font-size: 0.6rem; }
+
+  /* Price */
+  .cd-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; font-weight: 600; color: #5a9e82;
+  }
+
+  /* Rack chip */
+  .cd-rack-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: #f0faf5; border: 1px solid #b8e0cb;
+    border-radius: 7px; padding: 0.18rem 0.55rem;
+    font-size: 0.72rem; font-weight: 600; color: #2e7a56;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cd-rack-chip i { font-size: 0.65rem; color: #5a9e82; }
+
+  /* Dash for empty */
+  .cd-dash { color: #d4a8b4; font-size: 0.85rem; }
+
+  /* Empty state */
+  .cd-empty {
+    text-align: center;
+    padding: 3.5rem 1rem;
+  }
+  .cd-empty-icon {
+    font-size: 2.5rem; margin-bottom: 0.75rem;
+    opacity: 0.5;
+  }
+  .cd-empty-text {
+    font-size: 0.88rem; color: #b08090; font-weight: 600;
+  }
+  .cd-empty-sub {
+    font-size: 0.75rem; color: #d4a8b4; margin-top: 0.3rem;
+  }
+
+  @media (max-width: 640px) {
+    .cd-search-field { min-width: 120px; }
+    .cd-page-title { font-size: 1.3rem; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">{{ category_name }}</h5>
-    <form method="get" class="row g-2 mb-3">
-        <div class="col-auto">
-            <input type="text" name="asset_id" class="form-control" placeholder="Search by Asset ID" value="{{ search_asset }}">
-        </div>
-        <div class="col-auto">
-            <input type="text" name="item_code" class="form-control" placeholder="Search by Item Code" value="{{ search_item_code }}">
-        </div>
-        <div class="col-auto">
-            <input type="text" name="rack_name" class="form-control" placeholder="Search by Rack Name" value="{{ search_rack }}">
-        </div>
-        <div class="col-auto">
-            <input type="text" name="q" class="form-control" placeholder="Search by name" value="{{ search_text }}">
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Search</button>
-        </div>
-    </form>
-    <div class="card">
-        <div class="card-body">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>Asset ID</th>
-                        <th>Item Code</th>
-                        <th>Item Name</th>
-                        <th>Location</th>
-                        <th>Quantity</th>
-                        <th>Price</th>
-                        <th>Rack</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in products %}
-                    <tr>
-                        <td>{{ p.asset_id }}</td>
-                        <td>{{ p.item_code|default:"-" }}</td>
-                        <td>{{ p.item_name }}</td>
-                        <td>{{ p.computed_location|default:p.location }}</td>
-                        <td>{{ p.quantity_available }}{% if p.is_low_stock %} <span class="badge bg-warning">Low</span>{% endif %}</td>
-                        <td>{{ p.price|default:"-" }}</td>
-                        <td>{{ p.rack.rack_number|default:"-" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="7" class="text-muted">No items found.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="cd-wrapper">
+
+  <!-- ── Page header ── -->
+  <div class="cd-page-head">
+    <div class="cd-page-left">
+      <div class="cd-page-icon">📦</div>
+      <div>
+        <h1 class="cd-page-title">{{ category_name }}</h1>
+        <p class="cd-page-sub">Browse and search all items in this category</p>
+      </div>
     </div>
+  </div>
+
+  <!-- ── Search bar ── -->
+  <form method="get" class="cd-search-card">
+    <div class="cd-search-field">
+      <span class="cd-search-label">Asset ID</span>
+      <input type="text" name="asset_id" placeholder="e.g. AST-0042" value="{{ search_asset }}">
+    </div>
+    <div class="cd-search-field">
+      <span class="cd-search-label">Item Code</span>
+      <input type="text" name="item_code" placeholder="e.g. ITM-0088" value="{{ search_item_code }}">
+    </div>
+    <div class="cd-search-field">
+      <span class="cd-search-label">Rack Name</span>
+      <input type="text" name="rack_name" placeholder="e.g. Rack A1" value="{{ search_rack }}">
+    </div>
+    <div class="cd-search-field">
+      <span class="cd-search-label">Item Name</span>
+      <input type="text" name="q" placeholder="Search by name…" value="{{ search_text }}">
+    </div>
+    <button type="submit" class="cd-btn-search">
+      <i class="bi bi-search"></i> Search
+    </button>
+  </form>
+
+  <!-- ── Table card ── -->
+  <div class="cd-table-card">
+    <div class="cd-stripe"></div>
+
+    <div class="cd-table-toolbar">
+      <div class="cd-toolbar-left">
+        <div class="cd-tbl-icon"><i class="bi bi-table"></i></div>
+        <p class="cd-tbl-title">Inventory Items</p>
+        <span class="cd-tbl-count">{{ products|length }} item{{ products|length|pluralize }}</span>
+      </div>
+    </div>
+
+    <div class="cd-table-scroll">
+      <table class="cd-table">
+        <thead>
+          <tr>
+            <th>Asset ID</th>
+            <th>Item Code</th>
+            <th>Item Name</th>
+            <th>Racks &amp; Locations</th>
+            <th>On hand</th>
+            <th>On order</th>
+            <th>Total</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td>
+              <span class="cd-asset-chip">{{ p.asset_id }}</span>
+            </td>
+            <td>
+              {% if p.item_code %}
+                <span class="cd-code-chip">{{ p.item_code }}</span>
+              {% else %}
+                <span class="cd-dash">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="cd-item-name">{{ p.item_name }}</div>
+            </td>
+            <td>
+              {% for r in p.racks %}
+                <div style="margin-bottom: 0.35rem;">
+                  <span class="cd-location">
+                    <i class="bi bi-geo-alt"></i>
+                    {{ r.location }}
+                  </span>
+                  <div class="cd-item-sub" style="margin-left: 1.1rem;">
+                    On hand: <strong>{{ r.quantity }}</strong>
+                    &nbsp;|&nbsp;
+                    On order: <strong>{{ r.on_order }}</strong>
+                    &nbsp;|&nbsp;
+                    Total: <strong>{{ r.total }}</strong>
+                  </div>
+                </div>
+              {% endfor %}
+            </td>
+            <td>
+              <div class="cd-qty">
+                <span class="cd-qty-num">{{ p.total_quantity }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="cd-qty">
+                <span class="cd-qty-num">{{ p.total_on_order }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="cd-qty">
+                <span class="cd-qty-num">{{ p.total_items }}</span>
+              </div>
+            </td>
+            <td>
+              {% if p.price %}
+                <span class="cd-price">₹{{ p.price }}</span>
+              {% else %}
+                <span class="cd-dash">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8">
+              <div class="cd-empty">
+                <div class="cd-empty-icon">🔍</div>
+                <div class="cd-empty-text">No items found</div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

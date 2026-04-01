@@ -1,9 +1,39 @@
 {% extends 'inventory/base.html' %}
 {% block title %}My History{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">My History</h5>
+<style>
+    /* ── Status row colours ── */
+    .row-pending  { background: #fef9e0 !important; border-left: 3px solid #f59e0b; }
+    .row-approved { background: #fff4e6 !important; border-left: 3px solid #f97316; }
+    .row-issued   { background: #edf7f2 !important; border-left: 3px solid #5a9e82; }
+    .row-rejected { background: #fff0f4 !important; border-left: 3px solid var(--rose-500, #e08898); }
 
+    .row-pending td:first-child  { padding-left: 1rem; }
+    .row-approved td:first-child { padding-left: 1rem; }
+    .row-issued td:first-child   { padding-left: 1rem; }
+    .row-rejected td:first-child { padding-left: 1rem; }
+
+    /* ── Status badge pills ── */
+    .sb {
+        display: inline-flex; align-items: center; gap: .3rem;
+        padding: .2rem .6rem; border-radius: 999px;
+        font-size: .68rem; font-weight: 700; white-space: nowrap;
+    }
+    .sb .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .sb-pending  { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .sb-pending  .dot { background: #f59e0b; }
+    .sb-approved { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+    .sb-approved .dot { background: #f97316; }
+    .sb-issued   { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .sb-issued   .dot { background: #5a9e82; }
+    .sb-rejected { background: #fff0f4; color: #b8455f; border: 1px solid #fad8e2; }
+    .sb-rejected .dot { background: #e08898; }
+</style>
+
+<div class="container-fluid">
+    <h5 class="mb-3" style="font-family: var(--font); font-weight:600; color: var(--text-900);">My History</h5>
+
+    <!-- My Issue Requests -->
     <div class="card mb-3">
         <div class="card-body">
             <h6 class="card-title">My issue requests</h6>
@@ -20,11 +50,29 @@
                     </thead>
                     <tbody>
                         {% for ir in my_requests %}
-                        <tr>
+                        <tr class="
+                            {% if ir.status == 'pending' %}row-pending
+                            {% elif ir.status == 'approved' %}row-approved
+                            {% elif ir.status == 'issued' %}row-issued
+                            {% elif ir.status == 'rejected' %}row-rejected
+                            {% endif %}
+                        ">
                             <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
                             <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
                             <td>{{ ir.quantity }}</td>
-                            <td>{{ ir.get_status_display }}</td>
+                            <td>
+                                {% if ir.status == 'pending' %}
+                                    <span class="sb sb-pending"><span class="dot"></span> Pending</span>
+                                {% elif ir.status == 'approved' %}
+                                    <span class="sb sb-approved"><span class="dot"></span> Approved</span>
+                                {% elif ir.status == 'issued' %}
+                                    <span class="sb sb-issued"><span class="dot"></span> Issued</span>
+                                {% elif ir.status == 'rejected' %}
+                                    <span class="sb sb-rejected"><span class="dot"></span> Rejected</span>
+                                {% else %}
+                                    {{ ir.get_status_display }}
+                                {% endif %}
+                            </td>
                             <td class="text-muted small">{{ ir.rejection_reason|default:"-" }}</td>
                         </tr>
                         {% empty %}
@@ -36,6 +84,7 @@
         </div>
     </div>
 
+    <!-- Issued to Me -->
     <div class="card">
         <div class="card-body">
             <h6 class="card-title">Issued to me</h6>
@@ -54,7 +103,7 @@
                     </thead>
                     <tbody>
                         {% for r in my_issued %}
-                        <tr>
+                        <tr class="row-issued">
                             <td class="text-muted small">{{ r.issued_at|date:"Y-m-d H:i" }}</td>
                             <td>{{ r.product.asset_id }} — {{ r.product.item_name }}</td>
                             <td>{{ r.quantity }}</td>

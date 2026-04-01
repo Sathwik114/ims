@@ -1,0 +1,435 @@
+{% extends 'inventory/base.html' %}
+{% block title %}View Racks{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── reset Bootstrap btn inflation on this page ── */
+    .vr-wrap .btn { all: unset; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       LAYOUT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vr-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PAGE HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vr-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .vr-top h5 {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1e2035;
+        margin: 0 0 0.1rem;
+        letter-spacing: -0.02em;
+    }
+    .vr-top p {
+        font-size: 0.68rem;
+        color: #6b7490;
+        font-family: var(--mono);
+        margin: 0;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       STAT TILES
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vr-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.55rem;
+    }
+    @media(max-width:860px){ .vr-stats{ grid-template-columns: repeat(2,1fr); } }
+
+    .vr-tile {
+        background: #fff;
+        border-radius: 12px;
+        padding: 0.7rem 0.9rem;
+        border: 1px solid rgba(200,205,225,0.8);
+        box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.18s, box-shadow 0.18s;
+    }
+    .vr-tile:hover { transform: translateY(-2px); box-shadow: 0 5px 16px rgba(0,0,0,0.09); }
+    .vr-tile::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        border-radius: 12px 0 0 12px;
+    }
+    .vr-tile.t1::before { background: #7c3aed; }
+    .vr-tile.t2::before { background: #2563eb; }
+    .vr-tile.t3::before { background: #059669; }
+    .vr-tile.t4::before { background: #d97706; }
+
+    .vr-tile-ico {
+        width: 32px; height: 32px;
+        border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+    .vr-tile.t1 .vr-tile-ico { background: #f5f3ff; color: #7c3aed; }
+    .vr-tile.t2 .vr-tile-ico { background: #eff6ff; color: #2563eb; }
+    .vr-tile.t3 .vr-tile-ico { background: #ecfdf5; color: #059669; }
+    .vr-tile.t4 .vr-tile-ico { background: #fffbeb; color: #d97706; }
+
+    .vr-tile-lbl {
+        font-size: 0.58rem;
+        font-weight: 700;
+        color: #6b7490;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        font-family: var(--mono);
+        margin-bottom: 0.1rem;
+    }
+    .vr-tile-val {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #1e2035;
+        letter-spacing: -0.04em;
+        line-height: 1;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       FILTER ROW
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vr-filters {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        background: #fff;
+        border: 1px solid rgba(200,205,225,0.8);
+        border-radius: 12px;
+        padding: 0.55rem 0.9rem;
+        box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+    .vr-filters select,
+    .vr-filters input[type="text"] {
+        height: 30px;
+        padding: 0 0.65rem;
+        border: 1px solid rgba(180,140,220,0.3);
+        border-radius: 7px;
+        font-size: 0.76rem;
+        font-family: var(--font);
+        background: #fafbff;
+        color: #1e2035;
+        outline: none;
+        transition: border 0.15s, box-shadow 0.15s;
+    }
+    .vr-filters select { min-width: 140px; }
+    .vr-filters input[type="text"] { flex: 1; min-width: 160px; }
+    .vr-filters select:focus,
+    .vr-filters input[type="text"]:focus {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 2.5px rgba(124,58,237,0.10);
+    }
+    .vr-filter-sep {
+        width: 1px; height: 18px;
+        background: rgba(200,205,225,0.8);
+        flex-shrink: 0;
+    }
+    .vr-filter-lbl {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: #9090b0;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+    .vr-result-lbl {
+        margin-left: auto;
+        font-size: 0.62rem;
+        font-weight: 700;
+        font-family: var(--mono);
+        color: #7c3aed;
+        background: #f0ebff;
+        border: 1px solid rgba(124,58,237,0.18);
+        border-radius: 999px;
+        padding: 0.1rem 0.5rem;
+        white-space: nowrap;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       TABLE CARD
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .vr-card {
+        background: #fff;
+        border: 2px solid #7c3aed;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(124,58,237,0.18), 0 1px 6px rgba(124,58,237,0.10);
+        overflow: hidden;
+    }
+    .vr-card-head {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.6rem 1rem;
+        border-bottom: 2px solid #7c3aed;
+        background: linear-gradient(90deg, #f5f3ff, #ede9fe);
+    }
+    .vr-card-head-title {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #1e2035;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .vr-card-head-title i { color: #7c3aed; font-size: 0.78rem; }
+    .vr-card-hint {
+        margin-left: auto;
+        font-size: 0.6rem;
+        color: #9090b0;
+        font-family: var(--mono);
+    }
+
+    /* scroll area */
+    .vr-tbl-wrap {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+    .vr-tbl-wrap::-webkit-scrollbar { width: 3px; }
+    .vr-tbl-wrap::-webkit-scrollbar-track { background: #f5f3ff; }
+    .vr-tbl-wrap::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.30); border-radius: 4px; }
+
+    /* table */
+    .vr-tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+    /* thead — purple bg, white text */
+    .vr-tbl thead th {
+        position: sticky; top: 0; z-index: 2;
+        background: #1f0b42;
+        color: #ffffff;
+        font-family: var(--mono);
+        font-size: 0.58rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.55rem 0.9rem;
+        border-bottom: 2px solid #6d28d9;
+        border-right: 1px solid rgba(255,255,255,0.18);
+        white-space: nowrap;
+        text-align: center;
+    }
+    .vr-tbl thead th:last-child { border-right: none; }
+
+    /* tbody */
+    .vr-tbl tbody tr {
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+    .vr-tbl tbody tr:hover td { background: #f5f3ff; }
+    .vr-tbl tbody td {
+        padding: 0.55rem 0.9rem;
+        font-size: 0.78rem;
+        color: #1e2035;
+        border-bottom: 1px solid rgba(124,58,237,0.12);
+        border-right: 1px solid rgba(124,58,237,0.10);
+        vertical-align: middle;
+        text-align: center;
+    }
+    .vr-tbl tbody td:last-child { border-right: none; }
+    .vr-tbl tbody tr:last-child td { border-bottom: none; }
+
+    /* cell decorations — plain text, no chips/pills */
+    .rack-chip {
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    .cat-pill {
+        font-size: 0.76rem;
+        font-weight: 400;
+        color: #111827;
+    }
+    .cabin-txt { font-size: 0.76rem; color: #111827; }
+
+    .n-chip {
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .row-arr {
+        color: #d4c4f8;
+        font-size: 0.68rem;
+        transition: color 0.12s, transform 0.12s;
+    }
+    .vr-tbl tbody tr:hover .row-arr { color: #7c3aed; transform: translateX(3px); }
+
+    /* empty */
+    .vr-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: #6b7490;
+        font-size: 0.78rem;
+    }
+    .vr-empty i { font-size: 1.8rem; color: #c4b5fd; display: block; margin-bottom: 0.5rem; }
+
+    tr.vr-hidden { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+<div class="vr-wrap">
+
+    <!-- Header -->
+    <div class="vr-top">
+        <div>
+            <h5>View Racks</h5>
+            <p>Browse all racks and their inventory</p>
+        </div>
+    </div>
+
+    <!-- Stat tiles -->
+    <div class="vr-stats">
+        <div class="vr-tile t1">
+            <div class="vr-tile-ico"><i class="bi bi-layout-three-columns"></i></div>
+            <div>
+                <div class="vr-tile-lbl">Racks</div>
+                <div class="vr-tile-val">{{ total_racks }}</div>
+            </div>
+        </div>
+        <div class="vr-tile t2">
+            <div class="vr-tile-ico"><i class="bi bi-box-seam"></i></div>
+            <div>
+                <div class="vr-tile-lbl">Items</div>
+                <div class="vr-tile-val">{{ total_items_count }}</div>
+            </div>
+        </div>
+        <div class="vr-tile t3">
+            <div class="vr-tile-ico"><i class="bi bi-stack"></i></div>
+            <div>
+                <div class="vr-tile-lbl">Quantity</div>
+                <div class="vr-tile-val">{{ total_quantity_sum }}</div>
+            </div>
+        </div>
+        <div class="vr-tile t4">
+            <div class="vr-tile-ico"><i class="bi bi-currency-rupee"></i></div>
+            <div>
+                <div class="vr-tile-lbl">Value</div>
+                <div class="vr-tile-val">₹{{ total_value_sum|floatformat:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter row -->
+    <div class="vr-filters">
+        <span class="vr-filter-lbl">Category</span>
+        <select id="vr-cat" onchange="vrFilter()">
+            <option value="">All</option>
+            {% for cat in categories %}
+            <option value="{{ cat.slug }}" {% if selected_category == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="vr-filter-sep"></div>
+        <span class="vr-filter-lbl">Search</span>
+        <input type="text" id="vr-q" placeholder="Rack number, cabin…" value="{{ search }}" oninput="vrFilter()">
+        <span class="vr-result-lbl" id="vr-badge">{{ rack_summary|length }} rack{{ rack_summary|length|pluralize }}</span>
+    </div>
+
+    <!-- Table card -->
+    <div class="vr-card">
+        <div class="vr-card-head">
+            <div class="vr-card-head-title">
+                <i class="bi bi-table"></i> Racks
+            </div>
+            <span class="vr-card-hint">click a row to view details</span>
+        </div>
+
+        {% if rack_summary %}
+        <div class="vr-tbl-wrap">
+            <table class="vr-tbl" id="vr-tbl">
+                <thead>
+                    <tr>
+                        <th>Rack No.</th>
+                        <th>Category</th>
+                        <th>Cabin</th>
+                        <th>Items</th>
+                        <th>Qty</th>
+                        <th>Value</th>
+                        <th style="width:24px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="vr-tbody">
+                    {% for ri in rack_summary %}
+                    <tr class="vr-row"
+                        data-url="{% url 'inventory:rack_detail' ri.rack.pk %}"
+                        data-cat="{{ ri.rack.get_category_display|lower }}"
+                        data-q="{{ ri.rack.rack_number|lower }} {{ ri.rack.cabin_name|lower }}">
+                        <td><span class="rack-chip">{{ ri.rack.rack_number }}</span></td>
+                        <td>
+                            {% with c=ri.rack.get_category_display|lower %}
+                            <span class="cat-pill {% if 'network' in c %}networking{% elif 'hardware' in c %}hardware{% elif 'security' in c %}security{% elif 'server' in c %}server-parts{% else %}default{% endif %}">
+                                {{ ri.rack.get_category_display }}
+                            </span>
+                            {% endwith %}
+                        </td>
+                        <td><span class="cabin-txt">{{ ri.rack.cabin_name|default:"—" }}</span></td>
+                        <td><span class="n-chip it">{{ ri.total_items }}</span></td>
+                        <td><span class="n-chip qty">{{ ri.total_quantity }}</span></td>
+                        <td><span class="n-chip val">₹{{ ri.total_value|floatformat:2 }}</span></td>
+                        <td><i class="bi bi-chevron-right row-arr"></i></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="vr-empty">
+            <i class="bi bi-inbox"></i>
+            {% if search or selected_category %}No racks match your filters.{% else %}No racks available.{% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+</div><!-- /vr-wrap -->
+</div><!-- /container-fluid -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // row click
+    document.querySelectorAll('.vr-row').forEach(function(r) {
+        r.addEventListener('click', function() {
+            var u = this.getAttribute('data-url');
+            if (u) window.location.href = u;
+        });
+    });
+
+    function vrFilter() {
+        var cat = (document.getElementById('vr-cat') || {}).value || '';
+        var q   = ((document.getElementById('vr-q')  || {}).value || '').toLowerCase().trim();
+        var rows = document.querySelectorAll('#vr-tbody .vr-row');
+        var n = 0;
+        rows.forEach(function(r) {
+            var rc = r.dataset.cat || '';
+            var rq = r.dataset.q  || '';
+            var ok = (!cat || rc.includes(cat.toLowerCase())) && (!q || rq.includes(q));
+            r.classList.toggle('vr-hidden', !ok);
+            if (ok) n++;
+        });
+        var b = document.getElementById('vr-badge');
+        if (b) b.textContent = n + ' rack' + (n !== 1 ? 's' : '');
+    }
+
+    document.addEventListener('DOMContentLoaded', vrFilter);
+</script>
+{% endblock %}

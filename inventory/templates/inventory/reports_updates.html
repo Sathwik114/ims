@@ -1,25 +1,50 @@
 {% extends 'inventory/base.html' %}
+
 {% block title %}All Updates{% endblock %}
+
 {% block content %}
+
 <div class="container-fluid">
+
     <div class="d-flex align-items-center justify-content-between mb-3">
+
         <h5 class="mb-0">All Updates (items added/updated)</h5>
+
         <div class="d-flex gap-2">
+
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+
             <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:reports_updates_pdf' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">Download PDF</a>
+
         </div>
+
     </div>
+
     <form method="get" class="row g-2 mb-3">
+
         <div class="col-auto"><input type="date" name="from" class="form-control" value="{{ from_date }}"></div>
+
         <div class="col-auto"><input type="date" name="to" class="form-control" value="{{ to_date }}"></div>
+
         <div class="col-auto"><select name="month" class="form-select"><option value="">All months</option><option value="1" {% if search_month == "1" %}selected{% endif %}>Jan</option><option value="2" {% if search_month == "2" %}selected{% endif %}>Feb</option><option value="3" {% if search_month == "3" %}selected{% endif %}>Mar</option><option value="4" {% if search_month == "4" %}selected{% endif %}>Apr</option><option value="5" {% if search_month == "5" %}selected{% endif %}>May</option><option value="6" {% if search_month == "6" %}selected{% endif %}>Jun</option><option value="7" {% if search_month == "7" %}selected{% endif %}>Jul</option><option value="8" {% if search_month == "8" %}selected{% endif %}>Aug</option><option value="9" {% if search_month == "9" %}selected{% endif %}>Sep</option><option value="10" {% if search_month == "10" %}selected{% endif %}>Oct</option><option value="11" {% if search_month == "11" %}selected{% endif %}>Nov</option><option value="12" {% if search_month == "12" %}selected{% endif %}>Dec</option></select></div>
+
         <div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button></div>
+
     </form>
+
     <div class="card"><div class="card-body">
-        <div class="table-responsive"><table class="table table-sm mb-0">
-            <thead><tr><th>Asset ID</th><th>Item</th><th>Category</th><th>Qty</th><th>Created</th><th>Updated</th></tr></thead>
+
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;"><table class="table table-sm mb-0">
+
+            <thead class="sticky-top bg-white"><tr><th>Asset ID</th><th>Item</th><th>Category</th><th>Qty</th><th>Created</th><th>Updated</th></tr></thead>
+
             <tbody>{% for p in products %}<tr><td>{{ p.asset_id }}</td><td>{{ p.item_name }}</td><td>{{ p.get_category_display }}</td><td>{{ p.quantity_available }}</td><td>{{ p.created_at|date:"Y-m-d" }}</td><td>{{ p.updated_at|date:"Y-m-d H:i" }}</td></tr>{% empty %}<tr><td colspan="6" class="text-muted">No data.</td></tr>{% endfor %}</tbody>
+
         </table></div>
+
     </div></div>
+
 </div>
+
 {% endblock %}
+

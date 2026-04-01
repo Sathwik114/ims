@@ -1,204 +1,909 @@
 {% extends 'inventory/base.html' %}
 {% block title %}Issue Requests{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">Issue Requests</h5>
 
-    {% if user.stage == 3 %}
-    <div class="card mb-3">
-        <div class="card-body">
-            <h6 class="card-title">Request an item</h6>
-            <form method="get" class="row g-2 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">Category</label>
-                    <select name="category" class="form-select" onchange="this.form.submit()">
-                        {% for c in navbar_categories %}
-                        <option value="{{ c.slug }}" {% if category == c.slug %}selected{% endif %}>{{ c.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-8 d-flex align-items-end">
-                    <p class="text-muted small mb-0">
-                        Requester: <strong>{{ user.full_name|default:user.username }}</strong>
-                        {% if user.mobile_number %} ({{ user.mobile_number }}){% endif %}
-                    </p>
-                </div>
-            </form>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
 
-            {% if user_can_request_issue %}
-            <div class="row g-2 mb-3">
-                {% for p in products %}
-                <div class="col-6 col-lg-3">
-                    <div class="item-box text-center" data-asset-id="{{ p.asset_id }}" data-name="{{ p.item_name }}" data-qty="{{ p.quantity_available }}">
-                        <strong>{{ p.asset_id }}</strong><br>
-                        <small class="text-muted">{{ p.item_name }}</small><br>
-                        <small>Qty: {{ p.quantity_available }}</small>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="col-12 text-muted">No items in this category.</div>
-                {% endfor %}
+  :root {
+    --ink:       #0f1117;
+    --ink-2:     #2b2f3a;
+    --ink-3:     #6b7280;
+    --surface:   #f8f9fb;
+    --card:      #ffffff;
+    --border:    #e4e7ed;
+    --accent:    #2563eb;
+    --accent-lt: #eff4ff;
+    --warn:      #d97706;
+    --warn-lt:   #fffbeb;
+    --ok:        #059669;
+    --ok-lt:     #ecfdf5;
+    --danger:    #dc2626;
+    --danger-lt: #fef2f2;
+    --info:      #0891b2;
+    --info-lt:   #ecfeff;
+    --radius:    10px;
+    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.07);
+  }
+
+  /* ── Page Shell ── */
+  .ir-page {
+    font-family: 'Noto Sans', sans-serif;
+    color: var(--ink);
+    background: var(--surface);
+    min-height: 100vh;
+    padding: 2rem 1.25rem 3rem;
+  }
+
+  .ir-page-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 2rem;
+  }
+
+  .ir-page-header h1 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .ir-page-header .page-eyebrow {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .7rem;
+    letter-spacing: .1em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    background: var(--border);
+    padding: .2rem .55rem;
+    border-radius: 4px;
+  }
+
+  /* ── Cards ── */
+  .ir-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+    /* overflow must NOT be hidden — it clips the search dropdown */
+    overflow: visible;
+  }
+
+  .ir-card-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: 1rem 1.25rem .85rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ir-card-header .card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    flex-shrink: 0;
+  }
+
+  .icon-blue  { background: var(--accent-lt); color: var(--accent); }
+  .icon-warn  { background: var(--warn-lt);   color: var(--warn); }
+  .icon-green { background: var(--ok-lt);     color: var(--ok); }
+  .icon-info  { background: var(--info-lt);   color: var(--info); }
+
+  .ir-card-header h2 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .95rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .ir-card-header .badge-count {
+    margin-left: auto;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .7rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink-3);
+    padding: .18rem .5rem;
+    border-radius: 20px;
+  }
+
+  .ir-card-body {
+    padding: 1.25rem;
+    position: relative;
+    z-index: 10;
+    overflow: visible;
+  }
+
+  /* ── Request Form ── */
+  .req-form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.5fr 1.5fr auto;
+    gap: .75rem;
+    align-items: end;
+    overflow: visible;
+  }
+
+  @media (max-width: 900px) {
+    .req-form-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .req-form-grid .submit-col {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .req-form-grid { grid-template-columns: 1fr; }
+  }
+
+  .form-field {
+    position: relative;
+    overflow: visible;
+  }
+
+  .form-field label {
+    display: block;
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--ink-3);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    margin-bottom: .35rem;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    padding: .5rem .75rem;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .875rem;
+    color: var(--ink);
+    background: var(--surface);
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+  }
+
+  .form-field input:focus,
+  .form-field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    background: #fff;
+  }
+
+  .search-wrap {
+    position: relative;
+    z-index: 100;
+  }
+
+  #req_suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1.5px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    z-index: 9999;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  #req_suggestions button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: .55rem .85rem;
+    font-size: .8rem;
+    font-family: 'Noto Sans', sans-serif;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--ink);
+    transition: background .1s;
+  }
+
+  #req_suggestions button:last-child { border-bottom: none; }
+  #req_suggestions button:hover { background: var(--accent-lt); }
+
+  /* ── Buttons ── */
+  .btn-ir {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .5rem 1rem;
+    border-radius: 7px;
+    font-size: .8rem;
+    font-weight: 600;
+    font-family: 'Noto Sans', sans-serif;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter .15s, transform .1s, box-shadow .15s;
+    text-decoration: none;
+  }
+
+  .btn-ir:hover   { filter: brightness(.92); transform: translateY(-1px); }
+  .btn-ir:active  { transform: translateY(0); }
+  .btn-ir:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  .btn-primary  { background: var(--accent);  color: #fff; }
+  .btn-success  { background: var(--ok);      color: #fff; }
+  .btn-danger   { background: var(--danger);  color: #fff; }
+  .btn-outline  { background: transparent; border: 1.5px solid var(--border); color: var(--ink-2); }
+  .btn-outline:hover { border-color: var(--ink-2); filter: none; }
+  .btn-ghost    { background: var(--surface); color: var(--ink-2); border: 1.5px solid var(--border); }
+  .btn-sm       { padding: .3rem .65rem; font-size: .75rem; }
+
+  /* ── Tables ── */
+  .ir-table-wrap {
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  .ir-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+  }
+
+  .ir-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 500;
+    padding: .65rem .9rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    z-index: 5;
+  }
+
+  .ir-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+
+  .ir-table tbody tr:last-child { border-bottom: none; }
+  .ir-table tbody tr:hover { background: var(--surface); }
+
+  .ir-table td {
+    padding: .65rem .9rem;
+    vertical-align: middle;
+    color: var(--ink-2);
+  }
+
+  .cell-mono {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .75rem;
+    color: var(--ink-3);
+  }
+
+  .cell-name { font-weight: 500; color: var(--ink); }
+
+  .cell-sub {
+    font-size: .72rem;
+    color: var(--ink-3);
+    margin-top: .1rem;
+  }
+
+  .qty-chip {
+    display: inline-block;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .72rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: .15rem .45rem;
+    border-radius: 5px;
+    color: var(--ink-2);
+  }
+
+  /* inline approve form cells */
+  .approve-input {
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: .3rem .5rem;
+    font-size: .8rem;
+    font-family: 'Noto Sans', sans-serif;
+    width: 70px;
+    outline: none;
+    transition: border-color .15s;
+    background: var(--surface);
+  }
+  .approve-input:focus { border-color: var(--accent); }
+
+  .reason-input {
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: .3rem .55rem;
+    font-size: .8rem;
+    font-family: 'Noto Sans', sans-serif;
+    width: 130px;
+    outline: none;
+    transition: border-color .15s;
+    background: var(--surface);
+  }
+  .reason-input:focus { border-color: var(--warn); }
+
+  .reject-input {
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: .3rem .55rem;
+    font-size: .8rem;
+    width: 140px;
+    outline: none;
+    transition: border-color .15s;
+    background: var(--surface);
+  }
+  .reject-input:focus { border-color: var(--danger); }
+
+  .action-group {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+
+  /* ── Status Badges ── */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: .22rem .55rem;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .status-badge::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .s-pending   { background: var(--warn-lt);   color: var(--warn); }
+  .s-approved  { background: var(--ok-lt);     color: var(--ok); }
+  .s-issued    { background: var(--accent-lt); color: var(--accent); }
+  .s-confirmed { background: var(--info-lt);   color: var(--info); }
+  .s-rejected  { background: var(--danger-lt); color: var(--danger); }
+  .s-secondary { background: var(--surface);   color: var(--ink-3); border: 1px solid var(--border); }
+
+  /* ── Pagination ── */
+  .ir-pagination {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .75rem 1.25rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .ir-pagination .pg-info {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .72rem;
+    color: var(--ink-3);
+    margin-left: auto;
+  }
+
+  /* ── Empty State ── */
+  .empty-row td {
+    padding: 2rem;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: .82rem;
+    font-style: italic;
+  }
+
+  /* ── File link ── */
+  .file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    color: var(--accent);
+    text-decoration: none;
+    padding: .2rem .5rem;
+    border-radius: 5px;
+    border: 1px solid var(--accent-lt);
+    background: var(--accent-lt);
+    transition: background .1s;
+  }
+  .file-link:hover { background: #dbeafe; }
+
+  /* ── Pending card accent border ── */
+  .ir-card.warn-accent { border-top: 3px solid var(--warn); }
+  .ir-card.blue-accent { border-top: 3px solid var(--accent); }
+  .ir-card.green-accent { border-top: 3px solid var(--ok); }
+  .ir-card.info-accent { border-top: 3px solid var(--info); }
+
+  /* ── Scroll shadows ── */
+  .ir-table-wrap {
+    background:
+      linear-gradient(var(--card) 30%, transparent) center top,
+      linear-gradient(transparent, var(--card) 70%) center bottom,
+      radial-gradient(farthest-side at 50% 0,   rgba(0,0,0,.07), transparent) center top,
+      radial-gradient(farthest-side at 50% 100%, rgba(0,0,0,.07), transparent) center bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 32px, 100% 32px, 100% 10px, 100% 10px;
+    background-attachment: local, local, scroll, scroll;
+  }
+</style>
+
+<div class="ir-page">
+
+  <div class="ir-page-header">
+    <span class="page-eyebrow">Inventory</span>
+    <h1>Issue Requests</h1>
+  </div>
+
+  <!-- ── Request Form (stage 3 or user_can_request_issue) ── -->
+  {% if user_can_request_issue and request.GET.action == 'new' or user.stage == 3 and not request.GET.action %}
+  <div class="ir-card blue-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-blue">＋</span>
+      <h2>Request an Item</h2>
+    </div>
+    <div class="ir-card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="request">
+        <input type="hidden" name="asset_id" id="req_asset_id" value="">
+        <div class="req-form-grid">
+
+          <div class="form-field">
+            <label>Asset ID / Item Code / Name</label>
+            <div class="search-wrap">
+              <input class="form-control" id="req_search_input" autocomplete="off" placeholder="Search by ID, code or name…" style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;outline:none;width:100%;background:var(--surface);">
+              <div id="req_suggestions"></div>
             </div>
+          </div>
 
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="request">
-                <input type="hidden" name="asset_id" id="req_asset_id" value="">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label">Selected Asset ID</label>
-                        <input class="form-control" id="req_asset_display" readonly placeholder="Click an item above">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Quantity</label>
-                        {{ form.quantity }}
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100" id="btn_request" disabled>Submit request</button>
-                    </div>
-                </div>
-            </form>
-            {% endif %}
+          <div class="form-field">
+            <label>Quantity</label>
+            {{ form.quantity }}
+          </div>
+
+          <div class="form-field">
+            <label>Reason</label>
+            {{ form.reason }}
+          </div>
+
+          <div class="form-field">
+            <label>Attach file</label>
+            {{ form.attachment }}
+          </div>
+
+          <div class="submit-col">
+            <button type="submit" class="btn-ir btn-primary" id="btn_request" disabled style="height:38px;">
+              Submit
+            </button>
+          </div>
         </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Pending Approvals ── -->
+  {% if user_can_approve_issue_requests %}
+  <div class="ir-card warn-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-warn">⏳</span>
+      <h2>Pending Approvals</h2>
+      <span class="badge-count">Stage 1 / 2</span>
+    </div>
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Dept · Section</th>
+            <th>User</th>
+            <th>Mobile</th>
+            <th>Item</th>
+            <th>Avail</th>
+            <th>Req'd</th>
+            <th>File</th>
+            <th>Approve qty</th>
+            <th>Reason (if less)</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in pending_requests %}
+          <tr>
+            <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
+            <td>
+              {% if ir.requested_by_department %}
+                <span class="cell-name">{{ ir.get_requested_by_department_display }}</span>
+                <div class="cell-sub">{{ ir.get_requested_by_section_display|default:"-" }}</div>
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <span class="cell-name">{{ ir.requested_by.username }}</span>
+              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+            </td>
+            <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
+            <td>
+              <span class="cell-name">{{ ir.product.item_name }}</span>
+              <div class="cell-sub cell-mono">{{ ir.product.asset_id }}</div>
+            </td>
+            <td><span class="qty-chip">{{ ir.product.quantity_available }}</span></td>
+            <td><span class="qty-chip">{{ ir.quantity }}</span></td>
+            <td>
+              {% if ir.attachment %}
+                <a class="file-link" href="{% url 'inventory:issue_request_attachment' pk=ir.pk %}" target="_blank">📎 View</a>
+              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'inventory:issue_request_approve' pk=ir.pk %}">{% csrf_token %}
+                <input type="number" name="approved_quantity" class="approve-input" min="1" max="{{ ir.quantity }}" value="{{ ir.quantity }}">
+            </td>
+            <td>
+                <input name="partial_reason" class="reason-input" placeholder="Reason if partial…">
+            </td>
+            <td>
+              <div class="action-group">
+                <button class="btn-ir btn-success btn-sm" type="submit">✓ Approve</button>
+              </form>
+              <form method="post" action="{% url 'inventory:issue_request_reject' pk=ir.pk %}">{% csrf_token %}
+                <input name="reason" class="reject-input" placeholder="Rejection reason…">
+                <button class="btn-ir btn-sm" style="background:var(--danger-lt);color:var(--danger);border:1px solid var(--danger-lt);" type="submit">✕ Reject</button>
+              </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="11">No pending requests right now.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pending_requests.paginator.num_pages > 1 %}
+    <div class="ir-pagination">
+      {% if pending_requests.has_previous %}
+      <a class="btn-ir btn-ghost btn-sm" href="?p_page={{ pending_requests.previous_page_number }}&a_page={{ approved_requests.number }}">← Prev</a>
+      {% endif %}
+      {% if pending_requests.has_next %}
+      <a class="btn-ir btn-ghost btn-sm" href="?p_page={{ pending_requests.next_page_number }}&a_page={{ approved_requests.number }}">Next →</a>
+      {% endif %}
+      <span class="pg-info">Page {{ pending_requests.number }} / {{ pending_requests.paginator.num_pages }}</span>
     </div>
     {% endif %}
+  </div>
 
-    {% if user_can_approve_issue_requests %}
-    <div class="card mb-3 border-warning">
-        <div class="card-body">
-            <h6 class="card-title">Pending approvals (Stage 1/2)</h6>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>When</th>
-                            <th>User</th>
-                            <th>Mobile</th>
-                            <th>Item</th>
-                            <th>Available</th>
-                            <th>Qty</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for ir in pending_requests %}
-                        <tr>
-                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
-                            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
-                            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
-                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
-                            <td>{{ ir.product.quantity_available }}</td>
-                            <td>{{ ir.quantity }}</td>
-                            <td class="d-flex gap-2">
-                                <form method="post" action="{% url 'inventory:issue_request_approve' pk=ir.pk %}">{% csrf_token %}
-                                    <button class="btn btn-sm btn-success" type="submit">Approve</button>
-                                </form>
-                                <form method="post" action="{% url 'inventory:issue_request_reject' pk=ir.pk %}">{% csrf_token %}
-                                    <input name="reason" class="form-control form-control-sm d-inline-block" style="width: 220px;" placeholder="Reject reason (required)">
-                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Reject</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="7" class="text-muted">No pending requests.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- ── Approved Requests ── -->
+  <div class="ir-card green-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-green">✓</span>
+      <h2>Approved — Awaiting Issue</h2>
+    </div>
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>Approved</th>
+            <th>Dept · Section</th>
+            <th>User</th>
+            <th>Mobile</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Approved by</th>
+            <th>Approver Dept</th>
+            <th>Note</th>
+            <th>File</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in approved_requests %}
+          <tr>
+            <td class="cell-mono">{{ ir.approved_at|date:"d M H:i" }}</td>
+            <td>
+              {% if ir.requested_by_department %}
+                <span class="cell-name">{{ ir.get_requested_by_department_display }}</span>
+                <div class="cell-sub">{{ ir.get_requested_by_section_display|default:"-" }}</div>
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <span class="cell-name">{{ ir.requested_by.username }}</span>
+              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+            </td>
+            <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
+            <td>
+              <span class="cell-name">{{ ir.product.item_name }}</span>
+              <div class="cell-sub cell-mono">{{ ir.product.asset_id }}</div>
+            </td>
+            <td>
+              <span class="qty-chip">
+                {% if ir.approved_quantity %}{{ ir.approved_quantity }}<span style="opacity:.5"> /{{ ir.quantity }}</span>{% else %}{{ ir.quantity }}{% endif %}
+              </span>
+            </td>
+            <td>
+              <span class="cell-name">{{ ir.approved_by.username|default:"-" }}</span>
+              {% if ir.approved_by_full_name %}<div class="cell-sub">{{ ir.approved_by_full_name }}</div>{% endif %}
+            </td>
+            <td>
+              {% if ir.approved_by_department %}
+                <span class="cell-name">{{ ir.get_approved_by_department_display }}</span>
+                <div class="cell-sub">{{ ir.get_approved_by_section_display|default:"-" }}</div>
+              {% else %}-{% endif %}
+            </td>
+            <td class="cell-mono" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ ir.approval_note }}">{{ ir.approval_note|default:"—" }}</td>
+            <td>
+              {% if ir.attachment %}
+                <a class="file-link" href="{% url 'inventory:issue_request_attachment' pk=ir.pk %}" target="_blank">📎 View</a>
+              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'inventory:issue_request_issue' pk=ir.pk %}">{% csrf_token %}
+                <button class="btn-ir btn-primary btn-sm" type="submit">Mark issued</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="11">No approved requests waiting for issue.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if approved_requests.paginator.num_pages > 1 %}
+    <div class="ir-pagination">
+      {% if approved_requests.has_previous %}
+      <a class="btn-ir btn-ghost btn-sm" href="?p_page={{ pending_requests.number }}&a_page={{ approved_requests.previous_page_number }}">← Prev</a>
+      {% endif %}
+      {% if approved_requests.has_next %}
+      <a class="btn-ir btn-ghost btn-sm" href="?p_page={{ pending_requests.number }}&a_page={{ approved_requests.next_page_number }}">Next →</a>
+      {% endif %}
+      <span class="pg-info">Page {{ approved_requests.number }} / {{ approved_requests.paginator.num_pages }}</span>
     </div>
     {% endif %}
+  </div>
+  {% endif %}
 
-    {% if user_can_approve_issue_requests %}
-    <div class="card mb-3">
-        <div class="card-body">
-            <h6 class="card-title">Approved requests</h6>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Approved</th>
-                            <th>User</th>
-                            <th>Mobile</th>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Approved by</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for ir in approved_requests %}
-                        <tr>
-                            <td class="text-muted small">{{ ir.approved_at|date:"Y-m-d H:i" }}</td>
-                            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
-                            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
-                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
-                            <td>{{ ir.quantity }}</td>
-                            <td>{{ ir.approved_by.username|default:"-" }}</td>
-                            <td>
-                                <form method="post" action="{% url 'inventory:issue_request_issue' pk=ir.pk %}" class="d-inline">{% csrf_token %}
-                                    <button class="btn btn-sm btn-primary" type="submit">Mark as issued</button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="8" class="text-muted">No approved requests waiting for issue.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- ── My Requests (stage 3) ── -->
+  {% if user.stage == 3 %}
+  <div class="ir-card blue-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-blue">📋</span>
+      <h2>My Requests</h2>
     </div>
-    {% endif %}
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Dept · Section</th>
+            <th>Status</th>
+            <th>Approved by</th>
+            <th>Issued by</th>
+            <th>Confirmed by</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in my_requests %}
+          <tr>
+            <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
+            <td>
+              <span class="cell-name">{{ ir.product.item_name }}</span>
+              <div class="cell-sub cell-mono">{{ ir.product.asset_id }}</div>
+            </td>
+            <td><span class="qty-chip">{{ ir.quantity }}</span></td>
+            <td>
+              {% if ir.requested_by_department %}
+                <span class="cell-name">{{ ir.get_requested_by_department_display }}</span>
+                <div class="cell-sub">{{ ir.get_requested_by_section_display|default:"-" }}</div>
+              {% else %}-{% endif %}
+            </td>
+            <td>
+              <span class="status-badge
+                {% if ir.status == 'pending' %}s-pending
+                {% elif ir.status == 'approved' %}s-approved
+                {% elif ir.status == 'issued' %}s-issued
+                {% elif ir.status == 'confirmed' %}s-confirmed
+                {% else %}s-rejected{% endif %}">
+                {{ ir.get_status_display }}
+              </span>
+            </td>
+            <td>
+              {% if ir.approved_by %}<span class="cell-name">{{ ir.approved_by.username }}</span>
+              {% if ir.approved_by_full_name %}<div class="cell-sub">{{ ir.approved_by_full_name }}</div>{% endif %}
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td>
+              {% if ir.issued_by %}<span class="cell-name">{{ ir.issued_by.username }}</span>
+              {% if ir.issued_by_full_name %}<div class="cell-sub">{{ ir.issued_by_full_name }}</div>{% endif %}
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td>
+              {% if ir.confirmed_by %}<span class="cell-name">{{ ir.confirmed_by.username }}</span>
+              {% if ir.confirmed_by_full_name %}<div class="cell-sub">{{ ir.confirmed_by_full_name }}</div>{% endif %}
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td>
+              {% if ir.status == 'issued' %}
+              <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}">{% csrf_token %}
+                <button class="btn-ir btn-success btn-sm" type="submit" onclick="return confirm('Confirm receipt of this item?')">Confirm receipt</button>
+              </form>
+              {% elif ir.status == 'confirmed' %}
+              <span class="status-badge s-confirmed">Confirmed</span>
+              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="9">You haven't made any requests yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
-    <div class="card">
-        <div class="card-body">
-            <h6 class="card-title">My requests</h6>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>When</th>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Status</th>
-                            <th>Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for ir in my_requests %}
-                        <tr>
-                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
-                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
-                            <td>{{ ir.quantity }}</td>
-                            <td>{{ ir.get_status_display }}</td>
-                            <td class="text-muted small">{{ ir.rejection_reason|default:"-" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="5" class="text-muted">No requests yet.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- ── User Confirmation Pending ── -->
+  <div class="ir-card info-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-info">🔔</span>
+      <h2>User Confirmation Pending</h2>
     </div>
-</div>
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>Date / Time</th>
+            <th>Asset ID</th>
+            <th>Item Name</th>
+            <th>Requested By</th>
+            <th>Mobile</th>
+            <th>Qty</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>User Action</th>
+            <th>Details</th>
+            <th>Files</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in my_action_items %}
+          <tr>
+            <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
+            <td class="cell-mono">{{ ir.product.asset_id }}</td>
+            <td class="cell-name">{{ ir.product.item_name }}</td>
+            <td>
+              <span class="cell-name">{{ ir.requested_by.username }}</span>
+              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+            </td>
+            <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
+            <td><span class="qty-chip">{{ ir.quantity }}</span></td>
+            <td style="max-width:120px;font-size:.78rem;color:var(--ink-3);">{{ ir.request_reason|default:"—" }}</td>
+            <td>
+              <span class="status-badge
+                {% if ir.status == 'pending' %}s-pending
+                {% elif ir.status == 'approved' %}s-approved
+                {% elif ir.status == 'issued' %}s-issued
+                {% elif ir.status == 'confirmed' %}s-confirmed
+                {% else %}s-rejected{% endif %}">
+                {{ ir.get_status_display }}
+              </span>
+            </td>
+            <td>
+              {% if ir.status == 'pending' and ir.requested_by == request.user %}
+                <span class="status-badge s-pending">Awaiting Approval</span>
+              {% elif ir.status == 'approved' and ir.requested_by == request.user %}
+                <span class="status-badge s-approved">Awaiting Issue</span>
+              {% elif ir.status == 'issued' and ir.requested_by == request.user %}
+                <span class="status-badge s-issued">Confirm Receipt</span>
+              {% elif ir.status == 'rejected' and ir.requested_by == request.user %}
+                <span class="status-badge s-rejected">Rejected</span>
+              {% elif ir.status == 'confirmed' %}
+                <span class="status-badge s-confirmed">Completed</span>
+              {% else %}
+                <span class="status-badge s-secondary">No Action</span>
+              {% endif %}
+            </td>
+            <td style="font-size:.75rem;color:var(--ink-3);max-width:130px;">
+              {% if ir.status == 'rejected' and ir.rejection_reason %}
+                {{ ir.rejection_reason }}
+              {% elif ir.status == 'approved' and ir.approved_by == request.user %}
+                Approved by you
+              {% elif ir.status == 'issued' and ir.issued_by == request.user %}
+                Issued by you
+              {% elif ir.status == 'confirmed' and ir.confirmed_by == request.user %}
+                Confirmed by you
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if ir.attachment %}
+                <a class="file-link" href="{% url 'inventory:issue_request_attachment' pk=ir.pk %}" target="_blank">📎 View</a>
+              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="11">No action items found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /.ir-page -->
 
 <script>
-(function(){
-    const boxes = document.querySelectorAll('.item-box');
-    const assetHidden = document.getElementById('req_asset_id');
-    const assetDisplay = document.getElementById('req_asset_display');
-    const btn = document.getElementById('btn_request');
-    boxes.forEach(function(box){
-        box.addEventListener('click', function(){
-            boxes.forEach(b => b.classList.remove('selected'));
-            box.classList.add('selected');
-            assetHidden.value = box.dataset.assetId;
-            assetDisplay.value = box.dataset.assetId + ' — ' + (box.dataset.name || '');
-            btn.disabled = false;
+(function () {
+  const input  = document.getElementById('req_search_input');
+  const list   = document.getElementById('req_suggestions');
+  const hidden = document.getElementById('req_asset_id');
+  const btn    = document.getElementById('btn_request');
+
+  if (!input || !list) return;
+
+  function clearSuggestions() {
+    list.innerHTML = '';
+    list.style.display = 'none';
+  }
+
+  function selectItem(el) {
+    hidden.value  = el.dataset.assetId;
+    input.value   = el.dataset.label;
+    btn.disabled  = false;
+    clearSuggestions();
+  }
+
+  input.addEventListener('input', function () {
+    const q = input.value.trim();
+    hidden.value = '';
+    btn.disabled = true;
+    if (!q) { clearSuggestions(); return; }
+
+    fetch("{% url 'inventory:search_products_api' %}?q=" + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(items => {
+        list.innerHTML = '';
+        if (!items.length) { clearSuggestions(); return; }
+        items.forEach(p => {
+          const el = document.createElement('button');
+          el.type = 'button';
+          const label = `${p.asset_id} — ${p.item_name}`;
+          el.textContent = `${p.asset_id}  ·  ${p.item_code || '—'}  ·  ${p.item_name}{% if not user.is_stage3 %}  (Avail: ${p.available}){% endif %}`;
+          el.dataset.assetId = p.asset_id;
+          el.dataset.label   = `${p.asset_id} — ${p.item_name}`;
+          el.addEventListener('click', () => selectItem(el));
+          list.appendChild(el);
         });
-    });
+        list.style.display = 'block';
+      })
+      .catch(clearSuggestions);
+  });
+
+  document.addEventListener('click', e => {
+    if (!list.contains(e.target) && e.target !== input) clearSuggestions();
+  });
 })();
 </script>
+
 {% endblock %}

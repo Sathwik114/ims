@@ -1,0 +1,385 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Available Racks{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       LAYOUT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .ar-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PAGE HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .ar-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .ar-top h5 {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1e2035;
+        margin: 0 0 0.1rem;
+        letter-spacing: -0.02em;
+    }
+    .ar-top p {
+        font-size: 0.68rem;
+        color: #6b7490;
+        font-family: var(--mono);
+        margin: 0;
+    }
+    .btn-print {
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 0.3rem 0.8rem;
+        border-radius: 8px;
+        border: 1.5px solid rgba(200,205,225,0.9);
+        color: #4a5280;
+        background: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: all 0.15s;
+        line-height: 1.4;
+    }
+    .btn-print:hover { background: #f5f3ff; border-color: #7c3aed; color: #7c3aed; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       FILTER ROW
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .ar-filters {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        background: #fff;
+        border: 1px solid rgba(200,205,225,0.8);
+        border-radius: 12px;
+        padding: 0.55rem 0.9rem;
+        box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+    .ar-filters select,
+    .ar-filters input[type="text"] {
+        height: 30px;
+        padding: 0 0.65rem;
+        border: 1px solid rgba(180,140,220,0.3);
+        border-radius: 7px;
+        font-size: 0.76rem;
+        font-family: var(--font);
+        background: #fafbff;
+        color: #1e2035;
+        outline: none;
+        transition: border 0.15s, box-shadow 0.15s;
+    }
+    .ar-filters select { max-width: 160px; }
+    .ar-filters input[type="text"] { flex: 1; min-width: 180px; }
+    .ar-filters select:focus,
+    .ar-filters input[type="text"]:focus {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 2.5px rgba(124,58,237,0.10);
+    }
+    .ar-filter-sep { width: 1px; height: 18px; background: rgba(200,205,225,0.8); flex-shrink: 0; }
+    .ar-filter-lbl {
+        font-size: 0.6rem;
+        font-weight: 700;
+        color: #9090b0;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+    .ar-result-lbl {
+        margin-left: auto;
+        font-size: 0.65rem;
+        font-weight: 700;
+        font-family: var(--mono);
+        color: #6d28d9;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       RACK CARDS
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .ar-rack-block {
+        background: #fff;
+        border: 2px solid #7c3aed;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(124,58,237,0.18), 0 1px 6px rgba(124,58,237,0.10);
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+    }
+    .ar-rack-block.ar-hidden { display: none !important; }
+
+    /* rack header */
+    .ar-rack-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 1rem;
+        border-bottom: 2px solid #7c3aed;
+        background: linear-gradient(90deg, #f5f3ff, #ede9fe);
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .ar-rack-title {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #1e2035;
+    }
+    .ar-rack-title i { color: #7c3aed; font-size: 0.78rem; }
+    .ar-rack-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .ar-meta-pill {
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #1e2035;
+    }
+    .ar-meta-pill.items { color: #1e2035; }
+    .ar-meta-pill.value { color: #1e2035; }
+
+    /* inner table */
+    .ar-tbl-wrap {
+        overflow-x: auto;
+    }
+    .ar-tbl-wrap::-webkit-scrollbar { height: 3px; }
+    .ar-tbl-wrap::-webkit-scrollbar-track { background: #f5f3ff; }
+    .ar-tbl-wrap::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.25); border-radius: 4px; }
+
+    .ar-tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+    /* thead — purple, white text */
+    .ar-tbl thead th {
+        background: #7c3aed;
+        color: #ffffff;
+        font-family: var(--mono);
+        font-size: 0.58rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.5rem 0.9rem;
+        border-bottom: 2px solid #6d28d9;
+        border-right: 1px solid rgba(255,255,255,0.18);
+        white-space: nowrap;
+        text-align: center;
+    }
+    .ar-tbl thead th:last-child { border-right: none; }
+
+    /* tbody — plain black text, purple-tinted borders */
+    .ar-tbl tbody tr { transition: background 0.1s; }
+    .ar-tbl tbody tr:hover td { background: #f5f3ff; }
+    .ar-tbl tbody td {
+        padding: 0.5rem 0.9rem;
+        font-size: 0.78rem;
+        color: #111827;
+        font-weight: 400;
+        vertical-align: middle;
+        text-align: center;
+        border-bottom: 1px solid rgba(124,58,237,0.12);
+        border-right: 1px solid rgba(124,58,237,0.10);
+    }
+    .ar-tbl tbody td:last-child { border-right: none; }
+    .ar-tbl tbody tr:last-child td { border-bottom: none; }
+    .ar-tbl tbody td.td-name { text-align: left; font-weight: 500; }
+    .ar-tbl tbody td.td-id   { font-family: var(--mono); font-size: 0.72rem; }
+
+    /* empty rack */
+    .ar-rack-empty {
+        text-align: center;
+        padding: 1.2rem;
+        color: #9090b0;
+        font-size: 0.74rem;
+        font-style: italic;
+    }
+
+    /* no results */
+    .ar-no-results {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6b7490;
+        font-size: 0.78rem;
+    }
+    .ar-no-results i { font-size: 1.8rem; color: #c4b5fd; display: block; margin-bottom: 0.5rem; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PRINT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .print-heading, .print-subheading { display: none; }
+    @media print {
+        @page { size: landscape; margin: 12mm; }
+        .top-navbar, .ar-top, .ar-filters, nav, header, footer { display: none !important; }
+        body { background: #fff !important; }
+        .print-heading {
+            display: block !important;
+            font-size: 14pt; font-weight: 700; font-family: sans-serif; margin-bottom: 4pt;
+        }
+        .print-subheading {
+            display: block !important;
+            font-size: 8pt; font-family: monospace; color: #555; margin-bottom: 10pt;
+        }
+        .ar-rack-block { border: 1pt solid #aaa !important; box-shadow: none !important; margin-bottom: 12pt; page-break-inside: avoid; }
+        .ar-rack-head  { background: #eee !important; border-bottom: 1pt solid #aaa !important; }
+        .ar-rack-title, .ar-meta-pill { color: #000 !important; }
+        .ar-tbl thead th { background: #ddd !important; color: #000 !important; border: 1pt solid #aaa !important; font-size: 7pt !important; padding: 3pt 5pt !important; }
+        .ar-tbl tbody td { border: 1pt solid #ccc !important; font-size: 8pt !important; padding: 3pt 5pt !important; color: #000 !important; }
+        .ar-rack-block.ar-hidden { display: none !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+<div class="ar-wrap">
+
+    <!-- Header -->
+    <div class="ar-top">
+        <div>
+            <h5>Available Racks</h5>
+            <p>Racks with their items and quantities</p>
+        </div>
+        <button class="btn-print" onclick="doPrint()">
+            <i class="bi bi-printer"></i> Print
+        </button>
+    </div>
+
+    <!-- Filter row — auto search -->
+    <div class="ar-filters">
+        <span class="ar-filter-lbl">Category</span>
+        <select id="ar-cat" onchange="arFilter()">
+            <option value="">All</option>
+            {% for c in categories %}
+            <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="ar-filter-sep"></div>
+        <span class="ar-filter-lbl">Search</span>
+        <input type="text" id="ar-q"
+               placeholder="Rack number, cabin, item name, asset ID…"
+               value="{{ search }}" oninput="arFilter()">
+        <span class="ar-result-lbl" id="ar-badge">{{ rack_data|length }} rack{{ rack_data|length|pluralize }}</span>
+    </div>
+
+    <!-- Print headings -->
+    <div class="print-heading"    id="print-heading">Available Racks Report</div>
+    <div class="print-subheading" id="print-subheading"></div>
+
+    <!-- Rack blocks -->
+    {% if rack_data %}
+        {% for rack_info in rack_data %}
+        <div class="ar-rack-block"
+             data-cat="{{ rack_info.rack.get_category_display|lower }}"
+             data-q="{{ rack_info.rack.rack_number|lower }} {{ rack_info.rack.cabin_name|lower }} {% for item in rack_info.items %}{{ item.item_name|lower }} {{ item.asset_id|lower }} {% endfor %}">
+
+            <!-- Rack header -->
+            <div class="ar-rack-head">
+                <div class="ar-rack-title">
+                    <i class="bi bi-layout-three-columns"></i>
+                    {{ rack_info.rack.get_category_display }} — {{ rack_info.rack.rack_number }}
+                    {% if rack_info.rack.cabin_name %}
+                    <span style="font-weight:400;color:#6b7490;font-size:0.74rem;">({{ rack_info.rack.cabin_name }})</span>
+                    {% endif %}
+                </div>
+                <div class="ar-rack-meta">
+                    <span class="ar-meta-pill items">
+                        {{ rack_info.total_items }} item{{ rack_info.total_items|pluralize }} · {{ rack_info.total_quantity }} qty
+                    </span>
+                    <span class="ar-meta-pill value">
+                        ₹{{ rack_info.total_value|floatformat:2 }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Items table -->
+            {% if rack_info.items %}
+            <div class="ar-tbl-wrap">
+                <table class="ar-tbl">
+                    <thead>
+                        <tr>
+                            <th>Asset ID</th>
+                            <th>Item Name</th>
+                            <th>On Hand</th>
+                            <th>On Order</th>
+                            <th>Total</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in rack_info.items %}
+                        <tr>
+                            <td class="td-id">{{ item.asset_id }}</td>
+                            <td class="td-name">{{ item.item_name }}</td>
+                            <td>{{ item.quantity_available }}</td>
+                            <td>{{ item.on_order }}</td>
+                            <td>{{ item.total_items }}</td>
+                            <td>{{ item.price|default:"—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="ar-rack-empty">
+                <i class="bi bi-inbox" style="margin-right:0.3rem;"></i> No items in this rack
+            </div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+
+    {% else %}
+    <div class="ar-no-results">
+        <i class="bi bi-inbox"></i>
+        {% if search or selected_category %}No racks match your filters.{% else %}No racks found.{% endif %}
+    </div>
+    {% endif %}
+
+</div><!-- /ar-wrap -->
+</div><!-- /container-fluid -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function arFilter() {
+        var cat = (document.getElementById('ar-cat') || {}).value || '';
+        var q   = ((document.getElementById('ar-q')  || {}).value || '').toLowerCase().trim();
+        var blocks = document.querySelectorAll('.ar-rack-block[data-cat]');
+        var n = 0;
+        blocks.forEach(function(b) {
+            var bc = b.dataset.cat || '';
+            var bq = b.dataset.q   || '';
+            var ok = (!cat || bc.includes(cat.toLowerCase())) && (!q || bq.includes(q));
+            b.classList.toggle('ar-hidden', !ok);
+            if (ok) n++;
+        });
+        var badge = document.getElementById('ar-badge');
+        if (badge) badge.textContent = n + ' rack' + (n !== 1 ? 's' : '');
+    }
+
+    function doPrint() {
+        var cat = document.getElementById('ar-cat');
+        var q   = document.getElementById('ar-q');
+        var catLabel = cat && cat.value ? cat.options[cat.selectedIndex].text : 'All Categories';
+        var qVal     = q ? q.value.trim() : '';
+        var now      = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+        document.getElementById('print-heading').textContent    = catLabel + ' — Available Racks Report';
+        var sub = 'Printed: ' + now;
+        if (qVal) sub += '   |   Search: "' + qVal + '"';
+        document.getElementById('print-subheading').textContent = sub;
+        window.print();
+    }
+
+    document.addEventListener('DOMContentLoaded', arFilter);
+</script>
+{% endblock %}

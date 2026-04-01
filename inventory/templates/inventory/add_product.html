@@ -1,43 +1,320 @@
 {% extends 'inventory/base.html' %}
 {% block title %}Add Product - {{ category_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Gilda+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  /* ── Page wrapper ── */
+  .ap-wrapper {
+    padding: 0.5rem 0 2rem;
+    animation: apFadeUp 0.45s ease both;
+  }
+  @keyframes apFadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Breadcrumb row ── */
+  .ap-breadcrumb {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.75rem; color: var(--text-300, #d0a8b2);
+    margin-bottom: 1.5rem; font-family: 'DM Sans', sans-serif;
+  }
+  .ap-breadcrumb a {
+    color: var(--rose-500, #e08898); text-decoration: none; font-weight: 500;
+    transition: color 0.15s;
+  }
+  .ap-breadcrumb a:hover { color: var(--rose-700, #b8455f); }
+  .ap-breadcrumb i { font-size: 0.6rem; opacity: 0.5; }
+
+  /* ── Page heading ── */
+  .ap-page-title {
+    font-family: 'Gilda Display', serif;
+    font-size: 1.75rem; color: var(--text-900, #2d1520);
+    margin-bottom: 0.25rem; line-height: 1.2;
+  }
+  .ap-page-title span { color: var(--rose-600, #d4607a); font-style: italic; }
+  .ap-page-subtitle {
+    font-size: 0.8rem; color: var(--text-500, #a07080);
+    margin-bottom: 2rem; font-family: 'DM Sans', sans-serif;
+  }
+
+  /* ── Card ── */
+  .ap-card {
+    background: #ffffff;
+    border: 1px solid var(--rose-200, #fad8e2);
+    border-radius: 22px;
+    max-width: 560px;
+    box-shadow:
+      0 4px 24px rgba(180,60,90,0.08),
+      0 1px 4px rgba(180,60,90,0.04);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Soft gradient top-bar */
+  .ap-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg,
+      var(--rose-700, #b8455f),
+      var(--rose-500, #e08898),
+      #f0b8c8,
+      var(--rose-500, #e08898),
+      var(--rose-700, #b8455f)
+    );
+    background-size: 200%;
+    animation: apBarShift 6s linear infinite;
+  }
+  @keyframes apBarShift { 0% { background-position:0% } 100% { background-position:200% } }
+
+  .ap-card-header {
+    padding: 1.5rem 1.75rem 1.1rem;
+    border-bottom: 1px solid var(--rose-100, #fce8ee);
+    display: flex; align-items: center; gap: 0.75rem;
+    background: linear-gradient(to bottom, #fff8fa, #ffffff);
+  }
+  .ap-card-header-icon {
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--rose-100, #fce8ee), var(--rose-200, #fad8e2));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--rose-600, #d4607a); font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(212,96,122,0.15);
+  }
+  .ap-card-header-text { flex: 1; }
+  .ap-card-title {
+    font-family: 'Gilda Display', serif;
+    font-size: 1.05rem; color: var(--text-900, #2d1520); margin: 0; line-height: 1.2;
+  }
+  .ap-card-subtitle {
+    font-size: 0.72rem; color: var(--text-500, #a07080); margin: 0;
+    font-family: 'DM Sans', sans-serif; margin-top: 1px;
+  }
+
+  /* ── Card body ── */
+  .ap-card-body {
+    padding: 1.6rem 1.75rem 1.75rem;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* ── Field groups ── */
+  .ap-field {
+    margin-bottom: 1.15rem;
+    position: relative;
+  }
+
+  .ap-label {
+    display: block;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--text-500, #a07080);
+    margin-bottom: 0.38rem; font-family: 'DM Sans', sans-serif;
+  }
+
+  /* Override all Django-rendered inputs & selects */
+  .ap-card-body input,
+  .ap-card-body select,
+  .ap-card-body textarea {
+    width: 100% !important;
+    background: #fff8fb !important;
+    border: 1.5px solid var(--rose-200, #fad8e2) !important;
+    border-radius: 12px !important;
+    padding: 0.62rem 0.95rem !important;
+    font-size: 0.875rem !important;
+    font-family: 'DM Sans', sans-serif !important;
+    color: var(--text-900, #2d1520) !important;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s !important;
+    outline: none !important;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .ap-card-body input::placeholder { color: #ddb8c2 !important; }
+  .ap-card-body input:focus,
+  .ap-card-body select:focus,
+  .ap-card-body textarea:focus {
+    border-color: var(--rose-500, #e08898) !important;
+    box-shadow: 0 0 0 3.5px rgba(212,96,122,0.12), 0 1px 4px rgba(212,96,122,0.08) !important;
+    background: #ffffff !important;
+  }
+  .ap-card-body input:hover,
+  .ap-card-body select:hover {
+    border-color: var(--rose-300, #f5c8d4) !important;
+  }
+  .ap-card-body select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23e08898' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.9rem center !important;
+    padding-right: 2.5rem !important;
+    cursor: pointer;
+  }
+
+  /* ── Error ── */
+  .ap-error {
+    font-size: 0.7rem; color: var(--rose-700, #b8455f);
+    margin-top: 0.3rem; display: flex; align-items: center; gap: 0.3rem;
+    font-weight: 600;
+  }
+  .ap-error::before { content: '⚠'; font-size: 0.65rem; }
+
+  /* ── Two-column grid ── */
+  .ap-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+  }
+
+  /* ── Divider ── */
+  .ap-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--rose-200, #fad8e2), transparent);
+    margin: 1.4rem 0;
+  }
+
+  /* ── Action buttons ── */
+  .ap-actions {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding-top: 0.25rem;
+  }
+
+  .ap-btn-primary {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    background: linear-gradient(135deg, var(--rose-500, #e08898), var(--rose-700, #b8455f));
+    color: #ffffff; border: none; border-radius: 12px;
+    padding: 0.65rem 1.6rem; font-size: 0.875rem; font-weight: 700;
+    font-family: 'DM Sans', sans-serif; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(212,96,122,0.32);
+    transition: all 0.2s; letter-spacing: 0.01em;
+  }
+  .ap-btn-primary:hover {
+    background: linear-gradient(135deg, var(--rose-600, #d4607a), var(--rose-700, #b8455f));
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(212,96,122,0.42);
+  }
+  .ap-btn-primary:active { transform: translateY(0); }
+
+  .ap-btn-cancel {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: transparent; color: var(--text-500, #a07080);
+    border: 1.5px solid var(--rose-200, #fad8e2); border-radius: 12px;
+    padding: 0.65rem 1.25rem; font-size: 0.875rem; font-weight: 500;
+    font-family: 'DM Sans', sans-serif; text-decoration: none; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ap-btn-cancel:hover {
+    background: var(--rose-50, #fff0f4);
+    color: var(--rose-700, #b8455f);
+    border-color: var(--rose-300, #f5c8d4);
+  }
+
+  /* ── Hint bar ── */
+  .ap-hint {
+    display: flex; align-items: flex-start; gap: 0.55rem;
+    margin-top: 1.4rem; padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #fff5f7, #fff9fa);
+    border: 1px solid var(--rose-100, #fce8ee);
+    border-radius: 12px;
+    font-size: 0.75rem; color: var(--text-500, #a07080);
+    font-family: 'DM Sans', sans-serif; line-height: 1.5;
+  }
+  .ap-hint i { color: var(--rose-400, #eeaabb); margin-top: 1px; flex-shrink: 0; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-3">Add Product — {{ category_name }}</h5>
-    <div class="card" style="max-width: 540px;">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">Asset ID</label>
-                    {{ form.asset_id }}
-                    {% if form.asset_id.errors %}<div class="text-danger small">{{ form.asset_id.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Item Name</label>
-                    {{ form.item_name }}
-                    {% if form.item_name.errors %}<div class="text-danger small">{{ form.item_name.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Location</label>
-                    {{ form.location }}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Quantity Available</label>
-                    {{ form.quantity_available }}
-                    {% if form.quantity_available.errors %}<div class="text-danger small">{{ form.quantity_available.errors.0 }}</div>{% endif %}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Price</label>
-                    {{ form.price }}
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Rack</label>
-                    {{ form.rack }}
-                </div>
-                <button type="submit" class="btn btn-primary">Add Product</button>
-                <a href="{% url 'inventory:category_detail' category=category %}" class="btn btn-outline-secondary">Cancel</a>
-            </form>
-        </div>
+<div class="container-fluid ap-wrapper">
+
+  <!-- Breadcrumb -->
+  <div class="ap-breadcrumb">
+    <a href="{% url 'inventory:dashboard' %}"><i class="bi bi-house"></i> Dashboard</a>
+    <i class="bi bi-chevron-right"></i>
+    <a href="{% url 'inventory:category_detail' category=category %}">{{ category_name }}</a>
+    <i class="bi bi-chevron-right"></i>
+    <span style="color: var(--text-500);">Add Product</span>
+  </div>
+
+  <!-- Page heading -->
+  <h1 class="ap-page-title">Add to <span>{{ category_name }}</span></h1>
+  <p class="ap-page-subtitle">Fill in the details below to register a new product in this category.</p>
+
+  <!-- Form card -->
+  <div class="ap-card">
+    <div class="ap-card-header">
+      <div class="ap-card-header-icon"><i class="bi bi-box-seam"></i></div>
+      <div class="ap-card-header-text">
+        <p class="ap-card-title">New Product Entry</p>
+        <p class="ap-card-subtitle">All fields marked * are required</p>
+      </div>
     </div>
+
+    <div class="ap-card-body">
+      <form method="post">
+        {% csrf_token %}
+
+        <!-- Row 1: Asset ID + Item Name -->
+        <div class="ap-row">
+          <div class="ap-field">
+            <label class="ap-label">Asset ID *</label>
+            {{ form.asset_id }}
+            {% if form.asset_id.errors %}
+              <div class="ap-error">{{ form.asset_id.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="ap-field">
+            <label class="ap-label">Item Name *</label>
+            {{ form.item_name }}
+            {% if form.item_name.errors %}
+              <div class="ap-error">{{ form.item_name.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Row 2: Rack + Location -->
+        <div class="ap-row">
+          <div class="ap-field">
+            <label class="ap-label">Rack</label>
+            {{ form.rack }}
+          </div>
+          <div class="ap-field">
+            <label class="ap-label">Location</label>
+            {{ form.location }}
+          </div>
+        </div>
+
+        <!-- Row 3: Quantity + Price -->
+        <div class="ap-row">
+          <div class="ap-field">
+            <label class="ap-label">Quantity Available *</label>
+            {{ form.quantity_available }}
+            {% if form.quantity_available.errors %}
+              <div class="ap-error">{{ form.quantity_available.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="ap-field">
+            <label class="ap-label">Price</label>
+            {{ form.price }}
+          </div>
+        </div>
+
+        <div class="ap-divider"></div>
+
+        <!-- Actions -->
+        <div class="ap-actions">
+          <button type="submit" class="ap-btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Product
+          </button>
+          <a href="{% url 'inventory:category_detail' category=category %}" class="ap-btn-cancel">
+            Cancel
+          </a>
+        </div>
+
+        <!-- Hint -->
+        <div class="ap-hint">
+          <i class="bi bi-info-circle"></i>
+          <span>Product will be added to <strong style="color:var(--rose-600);">{{ category_name }}</strong>. Make sure the rack exists before saving — items without a valid rack cannot be placed.</span>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

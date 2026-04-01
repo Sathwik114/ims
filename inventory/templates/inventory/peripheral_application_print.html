@@ -1,0 +1,170 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Computer and Peripheral Application – #{{ pa.form_id }}{% endblock %}
+{% block content %}
+<style>
+  .brochure-wrap { max-width: 980px; margin: 0 auto; }
+  .brochure-toolbar { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; margin-bottom: .75rem; }
+  .brochure {
+    background: #fff;
+    border: 1px solid #000;
+    padding: 18px 18px 14px;
+  }
+  .brochure h3 { text-align:center; font-weight:700; margin:0 0 10px; }
+  .t { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+  .t td { border:1px solid #000; padding:6px; vertical-align:top; word-wrap:break-word; }
+  .lbl { width:20%; font-weight:700; }
+  .val { width:30%; }
+  .muted { color:#1f4ed8; font-weight:600; }
+  .section-title { font-weight:800; background:#f5f5f5; }
+  @media print {
+    .no-print { display:none !important; }
+    .container-fluid { padding:0 !important; }
+    .brochure { border:none; padding:0; }
+    .brochure-wrap { max-width:none; }
+  }
+</style>
+
+<div class="container-fluid brochure-wrap">
+  <div class="brochure-toolbar no-print">
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'inventory:issue_requests' %}">Back</a>
+    <button class="btn btn-outline-primary btn-sm" onclick="window.print()">Print</button>
+  </div>
+
+  <div class="brochure">
+    <h3>Computer and Peripheral Application</h3>
+
+    <table class="t">
+      <tr>
+        <td class="lbl">Application Department:</td>
+        <td class="val"><span class="muted">{{ pa.application_department|default:"-" }}</span></td>
+        <td class="lbl">Application Date:</td>
+        <td class="val"><span class="muted">{{ pa.created_at|date:"Y-m-d H:i" }}</span></td>
+        <td class="lbl">Unique ID:</td>
+        <td class="val"><span class="muted">{{ pa.form_id }}</span></td>
+      </tr>
+      <tr>
+        <td class="lbl">User:</td>
+        <td class="val"><span class="muted">{{ pa.user_full_name|default:"-" }}</span></td>
+        <td class="lbl">Employee ID:</td>
+        <td class="val"><span class="muted">{{ pa.employee_id|default:"-" }}</span></td>
+        <td class="lbl">Intercom No. :</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Equipment Name:</td>
+        <td class="val" colspan="3">&nbsp;</td>
+        <td class="lbl">Quantity:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Type:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Budget Number:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Remaining PC's Count:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Account passed date:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Requirement date:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Specification:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Additional Item:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Reason of Application:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Applicant:</td>
+        <td class="val">
+          <div><span class="muted">{{ pa.employee_id|default:"-" }}</span></div>
+          <div><span class="muted">{{ pa.applicant_name|default:"-" }}</span></div>
+        </td>
+        <td class="lbl">Head of Section:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Department Head:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+
+      <tr><td class="section-title" colspan="6">IT Department:</td></tr>
+      <tr>
+        <td class="lbl">IT Confirm:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl" colspan="3" style="text-align:right;">Approval:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Receiver:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Solver:</td>
+        <td class="val" colspan="3">&nbsp;</td>
+      </tr>
+
+      <tr><td class="section-title" colspan="6">For PC:</td></tr>
+      <tr>
+        <td class="val" colspan="6">
+          <div style="display:flex; gap:1.5rem; margin-bottom:.25rem;">
+            <label><input type="checkbox"> Asset ID</label>
+            <label><input type="checkbox"> Label</label>
+            <label><input type="checkbox"> Budget Number</label>
+          </div>
+          <div class="text-muted">Need to enter AssetID, Label, and Budget Number in the below textbox</div>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl">Verifier:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Auditor:</td>
+        <td class="val" colspan="3">&nbsp;</td>
+      </tr>
+
+      <tr><td class="section-title" colspan="6">Approval:</td></tr>
+      <tr>
+        <td class="lbl">President Approval:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+
+      <tr><td class="section-title" colspan="6">Purchase Department:</td></tr>
+      <tr>
+        <td class="lbl">Purchase Description:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Purchase Confirm:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Purchase Department Receiver:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Purchase Department Solver:</td>
+        <td class="val" colspan="5">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">PO Number:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">No. of Days to Delivered the Items:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">IT Manager:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+      <tr>
+        <td class="lbl">Purchase HOS:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">Issued:</td>
+        <td class="val">&nbsp;</td>
+        <td class="lbl">IT Receiver:</td>
+        <td class="val">&nbsp;</td>
+      </tr>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

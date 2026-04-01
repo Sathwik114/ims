@@ -1,26 +1,644 @@
 {% extends 'inventory/base.html' %}
-{% block title %}Login{% endblock %}
+{% block title %}Login — IT Inventory Management{% endblock %}
 {% block content %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-    <div class="card shadow-sm" style="width: 100%; max-width: 380px;">
-        <div class="card-body p-4">
-            <h4 class="card-title text-center mb-4">Inventory Management System</h4>
-            <p class="text-muted text-center small mb-3">Sign in with your username and password</p>
-            <form method="post" action="{% url 'inventory:login' %}">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label for="id_username" class="form-label">Username</label>
-                    <input type="text" name="username" id="id_username" class="form-control" placeholder="Username" required autofocus
-                           value="{{ form.username.value|default:'' }}">
-                </div>
-                <div class="mb-3">
-                    <label for="id_password" class="form-label">Password</label>
-                    <input type="password" name="password" id="id_password" class="form-control" placeholder="Password" required>
-                </div>
-                <input type="hidden" name="next" value="{{ request.GET.next }}">
-                <button type="submit" class="btn btn-primary w-100">Login</button>
-            </form>
-        </div>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+.lx-root *, .lx-root *::before, .lx-root *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.lx-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════
+   LEFT PANEL
+══════════════════════════════════════ */
+.lx-left {
+  width: 44%;
+  flex-shrink: 0;
+  background: linear-gradient(145deg, #0a1628 0%, #0d1f3c 40%, #0f2a50 70%, #091525 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px 48px;
+}
+
+.lx-left::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(99,162,255,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  z-index: 0;
+}
+
+.lx-orb1 {
+  position: absolute; top: -120px; right: -80px;
+  width: 420px; height: 420px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(59,130,246,0.22) 0%, transparent 65%);
+  z-index: 0;
+  animation: lx-pulse 6s ease-in-out infinite alternate;
+}
+.lx-orb2 {
+  position: absolute; bottom: -80px; left: -60px;
+  width: 280px; height: 280px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 65%);
+  z-index: 0;
+}
+@keyframes lx-pulse {
+  from { transform: scale(1); opacity: .7; }
+  to   { transform: scale(1.12); opacity: 1; }
+}
+
+.lx-left-edge {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(99,162,255,0.3) 30%, rgba(99,162,255,0.3) 70%, transparent);
+  z-index: 2;
+}
+
+.lx-left > * { position: relative; z-index: 1; }
+
+/* Logo */
+.lx-logo { display: flex; align-items: center; gap: 16px; margin-bottom: 44px; }
+
+.lx-logo-icon {
+  width: 66px; height: 66px;
+  border: 1.5px solid rgba(99,162,255,0.4);
+  border-radius: 18px;
+  background: rgba(59,130,246,0.1);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  box-shadow: 0 0 30px rgba(59,130,246,0.2), inset 0 0 18px rgba(59,130,246,0.07);
+  flex-shrink: 0;
+}
+.lx-logo-icon::before {
+  content: '';
+  position: absolute; inset: -7px; border-radius: 24px;
+  border: 1.5px solid transparent;
+  border-top-color: rgba(99,162,255,0.6);
+  border-right-color: rgba(99,162,255,0.15);
+  animation: lx-ring 8s linear infinite;
+}
+@keyframes lx-ring { to { transform: rotate(360deg); } }
+.lx-logo-icon svg { width: 32px; height: 32px; }
+
+.lx-logo-words {}
+.lx-logo-gti {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px; letter-spacing: 6px; line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 40px rgba(99,162,255,0.4);
+}
+.lx-logo-full {
+  font-size: 12px; font-weight: 500; letter-spacing: 2.5px;
+  color: #93c5fd;
+  text-transform: uppercase; margin-top: 3px;
+}
+
+/* Divider line */
+.lx-rule {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 36px;
+}
+.lx-rule-line { flex: 1; height: 1px; background: linear-gradient(to right, rgba(99,162,255,0.4), transparent); }
+.lx-rule-dot  { width: 5px; height: 5px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 8px #60a5fa; flex-shrink: 0; }
+
+/* Welcome headline */
+.lx-headline { margin-bottom: 20px; }
+.lx-headline-main {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(38px, 3.8vw, 58px);
+  letter-spacing: 3px; line-height: 1.05; color: #ffffff;
+  text-shadow: 0 2px 30px rgba(0,0,0,0.4);
+}
+.lx-headline-main span {
+  display: block;
+  background: linear-gradient(135deg, #93c5fd, #60a5fa, #a78bfa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(99,162,253,0.45));
+}
+
+.lx-tagline {
+  font-size: 14px; font-weight: 400; line-height: 1.75;
+  color: #94a3b8;
+  margin-bottom: 36px; max-width: 310px;
+}
+
+/* Feature rows */
+.lx-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 40px; }
+
+.lx-feat {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(99,162,255,0.2);
+  border-radius: 12px;
+  transition: background 0.2s, border-color 0.2s;
+  animation: lx-slide 0.5s ease both;
+}
+.lx-feat:nth-child(1){animation-delay:0.3s}
+.lx-feat:nth-child(2){animation-delay:0.45s}
+.lx-feat:nth-child(3){animation-delay:0.6s}
+@keyframes lx-slide {
+  from{opacity:0;transform:translateX(-16px);}
+  to{opacity:1;transform:translateX(0);}
+}
+.lx-feat:hover { background: rgba(99,162,255,0.08); border-color: rgba(99,162,255,0.35); }
+
+.lx-feat-ico {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: rgba(59,130,246,0.12);
+  border: 1px solid rgba(99,162,255,0.25);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.lx-feat-ico svg { width: 18px; height: 18px; }
+.lx-feat-title { font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 2px; }
+.lx-feat-sub   { font-size: 11px; color: #64748b; }
+
+/* Footer */
+.lx-left-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(99,162,255,0.12);
+}
+.lx-foot-ping { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 10px #4ade80; animation: lx-blink 2s ease-in-out infinite; flex-shrink: 0; }
+@keyframes lx-blink{0%,100%{opacity:1;}50%{opacity:0.25;}}
+.lx-foot-txt { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 1.5px; text-transform: uppercase; color: #475569; }
+
+/* ══════════════════════════════════════
+   RIGHT PANEL — Login Form
+══════════════════════════════════════ */
+.lx-right {
+  flex: 1;
+  background: #0b1525;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 28px;
+  position: relative; overflow-y: auto;
+}
+
+.lx-right-bg {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(59,130,246,0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
+  z-index: 0;
+}
+.lx-right-glow {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 560px; height: 560px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(37,99,235,0.1) 0%, transparent 65%);
+  z-index: 0; pointer-events: none;
+}
+
+.lx-form-wrap {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 430px;
+  animation: lx-up 0.8s cubic-bezier(0.16,1,0.3,1) both 0.2s;
+}
+@keyframes lx-up {
+  from{opacity:0;transform:translateY(28px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
+/* ── Card ── */
+.lx-card {
+  background: #111e35;
+  border: 1.5px solid rgba(99,162,255,0.3);
+  border-radius: 22px;
+  padding: 42px 40px 38px;
+  position: relative; overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 40px 100px rgba(0,0,0,0.5),
+    0 0 60px rgba(37,99,235,0.1);
+}
+
+/* Animated top beam */
+.lx-card::before {
+  content: '';
+  position: absolute; top: 0; left: 6%; right: 6%; height: 2px;
+  background: linear-gradient(90deg, transparent, #3b82f6, #93c5fd, #2563eb, transparent);
+  background-size: 200% 100%;
+  animation: lx-beam 4s ease-in-out infinite alternate;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 0 20px rgba(59,130,246,0.6);
+}
+@keyframes lx-beam {
+  0%{background-position:0% 0;opacity:0.8;}
+  100%{background-position:100% 0;opacity:1;}
+}
+
+/* Top inner glow */
+.lx-card::after {
+  content: '';
+  position: absolute; top: -40px; left: 50%; transform: translateX(-50%);
+  width: 300px; height: 160px;
+  background: radial-gradient(ellipse, rgba(59,130,246,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Card header */
+.lx-card-head {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 28px; padding-bottom: 22px;
+  border-bottom: 1.5px solid rgba(99,162,255,0.15);
+}
+.lx-card-ico {
+  width: 48px; height: 48px;
+  background: rgba(59,130,246,0.12);
+  border: 1.5px solid rgba(99,162,255,0.35);
+  border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 18px rgba(59,130,246,0.15);
+  flex-shrink: 0;
+}
+.lx-card-ico svg { width: 24px; height: 24px; }
+
+.lx-card-org  { font-size: 14px; font-weight: 700; color: #ffffff; letter-spacing: 0.3px; }
+.lx-card-sub2 {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: #60a5fa; letter-spacing: 2px; text-transform: uppercase; margin-top: 3px;
+}
+
+/* Eyebrow */
+.lx-eyebrow {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+  color: #60a5fa; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+}
+.lx-eyebrow::after { content:''; flex:1; height:1px; background:linear-gradient(to right,rgba(59,130,246,0.4),transparent); }
+
+/* Titles */
+.lx-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px; letter-spacing: 2px; line-height: 1;
+  color: #ffffff; margin-bottom: 4px;
+}
+.lx-card-title-accent {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px; letter-spacing: 4px;
+  background: linear-gradient(90deg, #93c5fd, #60a5fa, #a78bfa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; display: block; margin-bottom: 14px;
+}
+.lx-card-desc {
+  font-size: 13px; color: #94a3b8; line-height: 1.65; margin-bottom: 26px;
+}
+
+/* Error */
+.lx-error {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: rgba(239,68,68,0.1); border: 1.5px solid rgba(239,68,68,0.35);
+  border-left: 3px solid #ef4444; border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 20px;
+  font-size: 12.5px; color: #fca5a5; font-weight: 500;
+  animation: lx-shake 0.4s ease;
+}
+@keyframes lx-shake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-4px);}40%,80%{transform:translateX(4px);}}
+
+/* Labels */
+.lx-field { margin-bottom: 18px; }
+.lx-label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: #e2e8f0; letter-spacing: 0.4px; margin-bottom: 8px;
+}
+
+/* Inputs */
+.lx-input-wrap { position: relative; display: flex; align-items: center; }
+.lx-input-icon {
+  position: absolute; left: 14px;
+  color: #60a5fa; display: flex; pointer-events: none; transition: color 0.2s;
+}
+.lx-input {
+  width: 100%;
+  padding: 14px 14px 14px 44px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(99,162,255,0.3);
+  border-radius: 11px;
+  color: #ffffff;
+  font-family: var(--font);
+  font-size: 14px; font-weight: 400;
+  outline: none; caret-color: #60a5fa;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  -webkit-appearance: none;
+}
+.lx-input::placeholder { color: #475569; font-size: 13px; }
+.lx-input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 50px #111e35 inset;
+  -webkit-text-fill-color: #ffffff;
+}
+.lx-input-wrap:focus-within .lx-input-icon { color: #93c5fd; }
+.lx-input:focus {
+  border-color: #3b82f6;
+  background: rgba(59,130,246,0.08);
+  box-shadow: 0 0 0 3.5px rgba(59,130,246,0.18);
+}
+.lx-input:hover:not(:focus) { border-color: rgba(99,162,255,0.5); }
+
+.lx-pw-toggle {
+  position: absolute; right: 12px; background: none; border: none; cursor: pointer;
+  color: #475569; display: flex; align-items: center;
+  padding: 4px; border-radius: 5px; transition: color 0.2s;
+}
+.lx-pw-toggle:hover { color: #93c5fd; }
+
+/* Submit */
+.lx-submit-wrap { margin-top: 26px; }
+.lx-submit {
+  width: 100%; padding: 16px; border: none; border-radius: 12px;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb, #3b82f6);
+  color: #ffffff;
+  font-family: var(--font); font-size: 15px; font-weight: 700;
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.2s;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 40px rgba(37,99,235,0.45), 0 6px 20px rgba(0,0,0,0.3);
+}
+.lx-submit::before {
+  content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transition: left 0.5s ease;
+}
+.lx-submit:hover::before { left: 160%; }
+.lx-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 60px rgba(37,99,235,0.6), 0 10px 32px rgba(0,0,0,0.4);
+}
+.lx-submit:active { transform: scale(0.99); }
+.lx-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.lx-submit-inner { display:flex; align-items:center; justify-content:center; gap:8px; position:relative; z-index:1; }
+.lx-spinner { display:none; width:16px; height:16px; border:2.5px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:lx-spin 0.65s linear infinite; }
+.loading .lx-spinner { display:block; }
+.loading .lx-submit-text { display:none; }
+@keyframes lx-spin { to { transform:rotate(360deg); } }
+
+/* Divider */
+.lx-div { display:flex; align-items:center; gap:12px; margin:24px 0 20px; }
+.lx-div-line { flex:1; height:1px; background:rgba(99,162,255,0.15); }
+.lx-div-txt { font-size:11px; color:#64748b; white-space:nowrap; font-weight:500; }
+
+/* Stages */
+.lx-stages { display:flex; gap:8px; }
+.lx-stage {
+  flex:1; padding:11px 8px; border-radius:10px;
+  background:rgba(255,255,255,0.04); border:1.5px solid rgba(99,162,255,0.18);
+  text-align:center; cursor:default; transition:all 0.2s;
+}
+.lx-stage:hover { background:rgba(99,162,255,0.1); border-color:rgba(99,162,255,0.4); }
+.lx-stage-dot { width:7px; height:7px; border-radius:50%; margin:0 auto 6px; }
+.lx-stage-name { font-size:12px; font-weight:700; color:#e2e8f0; }
+.lx-stage-role { font-size:10px; color:#64748b; margin-top:3px; font-weight:500; }
+
+.lx-footer {
+  margin-top:18px; text-align:center;
+  font-size:11px; color:#334155; letter-spacing:0.3px;
+}
+
+@media (max-width:900px) {
+  .lx-left { display:none; }
+}
+@media (max-width:480px) {
+  .lx-card { padding:28px 22px 24px; }
+}
+</style>
+
+<div class="lx-root">
+
+  <!-- LEFT -->
+  <div class="lx-left">
+    <div class="lx-orb1"></div>
+    <div class="lx-orb2"></div>
+    <div class="lx-left-edge"></div>
+
+    <div class="lx-logo">
+      <div class="lx-logo-icon">
+        <svg viewBox="0 0 34 34" fill="none">
+          <path d="M17 3C10 3 3 10 5.5 19C8 26 15 29.5 21.5 26C28 22.5 31 15 28 8.5C25 3.5 20 3 17 3Z"
+            fill="rgba(99,162,255,0.12)" stroke="#60a5fa" stroke-width="1.4"/>
+          <path d="M17 30L17 20" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M10 15L13.5 15L13.5 19L20.5 19L20.5 15L24 15"
+            stroke="rgba(147,197,253,0.65)" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="10" cy="15" r="1.7" fill="#93c5fd"/>
+          <circle cx="24" cy="15" r="1.7" fill="#93c5fd"/>
+        </svg>
+      </div>
+      <div class="lx-logo-words">
+        <div class="lx-logo-gti" style="color: #f6f2f7;">GTI</div>
+        <div class="lx-logo-full"><b>GREENTECH INDUSTRIES</b></div>
+      </div>
     </div>
+
+    <div class="lx-rule">
+      <div class="lx-rule-line"></div>
+      <div class="lx-rule-dot"></div>
+    </div>
+
+    <div class="lx-headline">
+      <div class="lx-headline-main">
+        IT Inventory<br><span>Management</span>
+      </div>
+    </div>
+
+    <p class="lx-tagline">Secure, centralized control of all your IT assets — hardware, software, and infrastructure managed from one intelligent platform.</p>
+
+    <div class="lx-features">
+      <div class="lx-feat">
+        <div class="lx-feat-ico">
+          <svg viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="3" width="16" height="11" rx="2" stroke="#60a5fa" stroke-width="1.4"/>
+            <path d="M6 17h8M10 14v3" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+            <rect x="4.5" y="6" width="3" height="2.5" rx="0.6" fill="#93c5fd" opacity="0.8"/>
+            <rect x="9" y="6" width="3" height="2.5" rx="0.6" fill="#93c5fd" opacity="0.8"/>
+            <rect x="4.5" y="9.5" width="7.5" height="1.5" rx="0.5" fill="#bfdbfe" opacity="0.6"/>
+          </svg>
+        </div>
+        <div>
+          <div class="lx-feat-title">Asset Tracking</div>
+          <div class="lx-feat-sub">Real-time hardware & software inventory</div>
+        </div>
+      </div>
+
+      <div class="lx-feat">
+        <div class="lx-feat-ico">
+          <svg viewBox="0 0 20 20" fill="none">
+            <rect x="4" y="7.5" width="12" height="9.5" rx="2" stroke="#60a5fa" stroke-width="1.4"/>
+            <path d="M7 7.5V5.5a3 3 0 0 1 6 0v2" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="10" cy="12" r="1.6" fill="#93c5fd"/>
+            <path d="M10 13.5V15" stroke="#93c5fd" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="lx-feat-title">Role-Based Access</div>
+          <div class="lx-feat-sub">3-tier secure permission control</div>
+        </div>
+      </div>
+
+      <div class="lx-feat">
+        <div class="lx-feat-ico">
+          <svg viewBox="0 0 20 20" fill="none">
+            <path d="M3 5.5h14M3 10h14M3 14.5h8" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="15.5" cy="14" r="2.8" stroke="#60a5fa" stroke-width="1.3"/>
+            <path d="M14.4 14l.8.8 1.5-1.4" stroke="#93c5fd" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="lx-feat-title">Full Audit Logs</div>
+          <div class="lx-feat-sub">Complete activity trail & reporting</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lx-left-foot">
+      <div class="lx-foot-ping"></div>
+      <span class="lx-foot-txt" style="color:#0bb3bf;">All systems operational · GTI © 2025</span>
+        </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="lx-right">
+    <div class="lx-right-bg"></div>
+    <div class="lx-right-glow"></div>
+
+    <div class="lx-form-wrap">
+      <div class="lx-card">
+
+        <div class="lx-card-head">
+          <div class="lx-card-ico">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="3" width="20" height="14" rx="3" stroke="#60a5fa" stroke-width="1.7"/>
+              <path d="M8 21h8M12 17v4" stroke="#60a5fa" stroke-width="1.7" stroke-linecap="round"/>
+              <rect x="5.5" y="6.5" width="3" height="3" rx="0.7" fill="#93c5fd"/>
+              <rect x="10.5" y="6.5" width="3" height="3" rx="0.7" fill="#93c5fd"/>
+              <rect x="5.5" y="10.5" width="3" height="2" rx="0.7" fill="#bfdbfe" opacity="0.7"/>
+              <rect x="10.5" y="10.5" width="7" height="2" rx="0.7" fill="#bfdbfe" opacity="0.7"/>
+            </svg>
+          </div>
+          <div>
+            <div class="lx-card-org">Green Tech Industries</div>
+            <div class="lx-card-sub2">IT-IMS · Secure Portal</div>
+          </div>
+        </div>
+
+        <div class="lx-eyebrow">IT Inventory Management System</div>
+        <div class="lx-card-title">Welcome Back</div>
+        <span class="lx-card-title-accent">Sign in to IT-IMS Platform</span>
+        <div class="lx-card-desc">Enter your GTI credentials to access the IT Inventory Management System.</div>
+
+        {% if form.errors %}
+        <div class="lx-error">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0;margin-top:1px;">
+            <circle cx="7" cy="7" r="6.5" stroke="#ef4444" stroke-width="1.3"/>
+            <path d="M7 4.5V8" stroke="#ef4444" stroke-width="1.4" stroke-linecap="round"/>
+            <circle cx="7" cy="10" r="0.8" fill="#ef4444"/>
+          </svg>
+          Incorrect username or password. Please try again.
+        </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'inventory:login' %}" id="loginForm" autocomplete="on">
+          {% csrf_token %}
+
+          <div class="lx-field">
+            <label for="id_username" class="lx-label">Username</label>
+            <div class="lx-input-wrap">
+              <span class="lx-input-icon">
+                <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M2.5 14c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <input type="text" name="username" id="id_username" class="lx-input"
+                placeholder="Enter your username" required autofocus autocomplete="username"
+                value="{{ form.username.value|default:'' }}">
+            </div>
+          </div>
+
+          <div class="lx-field">
+            <label for="id_password" class="lx-label">Password</label>
+            <div class="lx-input-wrap">
+              <span class="lx-input-icon">
+                <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
+                  <rect x="3" y="7" width="10" height="7.5" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="8" cy="10.8" r="1.2" fill="currentColor"/>
+                </svg>
+              </span>
+              <input type="password" name="password" id="id_password" class="lx-input"
+                placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="lx-pw-toggle" id="pwToggle" aria-label="Show password">
+                <svg id="eyeShow" width="17" height="17" viewBox="0 0 16 16" fill="none">
+                  <path d="M1.5 8s2.5-5 6.5-5 6.5 5 6.5 5-2.5 5-6.5 5-6.5-5-6.5-5Z" stroke="currentColor" stroke-width="1.4"/>
+                  <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/>
+                </svg>
+                <svg id="eyeHide" width="17" height="17" viewBox="0 0 16 16" fill="none" style="display:none">
+                  <path d="M2 2l12 12M6.8 7a2 2 0 0 0 2.8 2.8M4.5 4.7C2.8 5.8 1.5 8 1.5 8s2.5 5 6.5 5c1.4 0 2.7-.5 3.8-1.2M7.3 3.1C7.7 3 8 3 8.5 3c4 0 6.5 5 6.5 5s-.7 1.4-2 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <input type="hidden" name="next" value="{{ request.GET.next }}">
+
+          <div class="lx-submit-wrap">
+            <button type="submit" class="lx-submit" id="submitBtn">
+              <span class="lx-submit-inner">
+                <span class="lx-spinner"></span>
+                <span class="lx-submit-text">Sign In →</span>
+              </span>
+            </button>
+          </div>
+        </form>
+
+        <div class="lx-div">
+          <div class="lx-div-line"></div>
+          <span class="lx-div-txt">Access Tiers</span>
+          <div class="lx-div-line"></div>
+        </div>
+
+        <div class="lx-stages">
+          <div class="lx-stage">
+            <div class="lx-stage-dot" style="background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,0.7);"></div>
+            <div class="lx-stage-name">Stage 1</div>
+            <div class="lx-stage-role">Admin</div>
+          </div>
+          <div class="lx-stage">
+            <div class="lx-stage-dot" style="background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,0.7);"></div>
+            <div class="lx-stage-name">Stage 2</div>
+            <div class="lx-stage-role">Executor</div>
+          </div>
+          <div class="lx-stage">
+            <div class="lx-stage-dot" style="background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,0.7);"></div>
+            <div class="lx-stage-name">Stage 3</div>
+            <div class="lx-stage-role">User</div>
+          </div>
+        </div>
+
+        <div class="lx-footer" style="color:#dbcae3;">Accounts provisioned by GTI IT Department only</div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+const pw = document.getElementById('id_password');
+document.getElementById('pwToggle').addEventListener('click', () => {
+  const h = pw.type === 'password';
+  pw.type = h ? 'text' : 'password';
+  document.getElementById('eyeShow').style.display = h ? 'none' : 'block';
+  document.getElementById('eyeHide').style.display = h ? 'block' : 'none';
+});
+document.getElementById('loginForm').addEventListener('submit', () => {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+});
+</script>
 {% endblock %}

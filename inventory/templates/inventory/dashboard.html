@@ -1,145 +1,860 @@
 {% extends 'inventory/base.html' %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="container-fluid">
-    <h5 class="mb-4">Dashboard</h5>
-    <div class="row">
-        <div class="{% if show_right_panel %}col-lg-8{% else %}col-lg-12{% endif %}">
-            <div class="row g-3">
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">Networking</h6>
-                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
-                                <canvas id="pie_networking"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">Hardware</h6>
-                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
-                                <canvas id="pie_hardware"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">Security</h6>
-                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
-                                <canvas id="pie_security"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-6">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">Server Parts</h6>
-                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
-                                <canvas id="pie_server_parts"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">Available items by Category</h6>
-                            <div class="pie-wrap" style="width:10rem;height:10rem;margin:0 auto;">
-                                <canvas id="pie_overall"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
+<style>
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       DASHBOARD TOKENS (inherits base vars)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    :root {
+        --c1: #2563eb; /* networking  */
+        --c2: #7c3aed; /* hardware    */
+        --c3: #059669; /* security    */
+        --c4: #d97706; /* server parts*/
+        --c5: #0891b2; /* overall     */
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       FULL-SCREEN FIT
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .dash-wrap {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - var(--nb-h) - 2rem);
+        overflow: hidden;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       PAGE HEADER
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .dash-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.85rem;
+        flex-shrink: 0;
+        animation: fadeUp 0.35s ease both;
+    }
+    .dash-header-left h1 {
+        font-size: 1.25rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: #2d1520;
+        margin: 0 0 0.1rem;
+    }
+    .dash-header-left p {
+        font-size: 0.72rem;
+        color: #7a5060;
+        font-family: var(--mono);
+        margin: 0;
+    }
+    .dash-live {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        border-radius: 999px;
+        padding: 0.28rem 0.8rem;
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #065f46;
+        font-family: var(--mono);
+        letter-spacing: 0.04em;
+    }
+    .dash-live-dot {
+        width: 6px; height: 6px;
+        background: #059669;
+        border-radius: 50%;
+        animation: blink 1.8s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       STAT SUMMARY STRIP
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .stat-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.65rem;
+        margin-bottom: 0.75rem;
+        flex-shrink: 0;
+    }
+    @media(max-width:860px){ .stat-strip{ grid-template-columns: repeat(2,1fr); } }
+
+    .stat-tile {
+        background: #fff;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: box-shadow 0.2s, transform 0.2s;
+        animation: fadeUp 0.4s ease both;
+        position: relative;
+        overflow: hidden;
+    }
+    /* Glowing coloured left border per tile */
+    .stat-tile::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        border-radius: 12px 0 0 12px;
+    }
+    .stat-tile.s-blue   { border: 1.5px solid rgba(37,99,235,0.25);  box-shadow: 0 2px 14px rgba(37,99,235,0.10); }
+    .stat-tile.s-violet { border: 1.5px solid rgba(124,58,237,0.25); box-shadow: 0 2px 14px rgba(124,58,237,0.10); }
+    .stat-tile.s-green  { border: 1.5px solid rgba(5,150,105,0.25);  box-shadow: 0 2px 14px rgba(5,150,105,0.10); }
+    .stat-tile.s-amber  { border: 1.5px solid rgba(217,119,6,0.25);  box-shadow: 0 2px 14px rgba(217,119,6,0.10); }
+    .stat-tile.s-blue::before   { background: #2563eb; }
+    .stat-tile.s-violet::before { background: #7c3aed; }
+    .stat-tile.s-green::before  { background: #059669; }
+    .stat-tile.s-amber::before  { background: #d97706; }
+    .stat-tile:hover { transform: translateY(-2px); }
+    .stat-tile.s-blue:hover   { box-shadow: 0 6px 22px rgba(37,99,235,0.18); }
+    .stat-tile.s-violet:hover { box-shadow: 0 6px 22px rgba(124,58,237,0.18); }
+    .stat-tile.s-green:hover  { box-shadow: 0 6px 22px rgba(5,150,105,0.18); }
+    .stat-tile.s-amber:hover  { box-shadow: 0 6px 22px rgba(217,119,6,0.18); }
+    .stat-tile:nth-child(1){ animation-delay:.05s }
+    .stat-tile:nth-child(2){ animation-delay:.10s }
+    .stat-tile:nth-child(3){ animation-delay:.15s }
+    .stat-tile:nth-child(4){ animation-delay:.20s }
+
+    .stat-tile-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+    .stat-tile-icon.blue   { background: #eff6ff; color: #2563eb; }
+    .stat-tile-icon.violet { background: #f5f3ff; color: #7c3aed; }
+    .stat-tile-icon.green  { background: #ecfdf5; color: #059669; }
+    .stat-tile-icon.amber  { background: #fffbeb; color: #d97706; }
+    .stat-tile-info { flex: 1; min-width: 0; }
+    .stat-tile-label {
+        font-size: 0.62rem;
+        font-weight: 600;
+        color: #7a5060;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        margin-bottom: 0.15rem;
+        font-family: var(--mono);
+    }
+    .stat-tile-value {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #2d1520;
+        letter-spacing: -0.04em;
+        line-height: 1;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       SCROLLABLE MAIN BODY
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .dash-body {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 2px;
+    }
+    .dash-body::-webkit-scrollbar { width: 4px; }
+    .dash-body::-webkit-scrollbar-track { background: transparent; }
+    .dash-body::-webkit-scrollbar-thumb { background: rgba(180,140,220,0.3); border-radius: 4px; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       CHART CARDS — STYLED BORDERS
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .chart-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 1rem 1.1rem;
+        transition: box-shadow 0.2s, transform 0.2s;
+        animation: fadeUp 0.45s ease both;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    /* Top glowing border strip */
+    .chart-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        border-radius: 16px 16px 0 0;
+    }
+    /* Subtle corner accent */
+    .chart-card::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 60px; height: 60px;
+        border-radius: 0 16px 0 100%;
+        opacity: 0.06;
+    }
+
+    /* Per-category colour variants */
+    .chart-card.cc-blue {
+        border: 1.5px solid rgba(37,99,235,0.22);
+        box-shadow: 0 2px 16px rgba(37,99,235,0.08), 0 1px 3px rgba(37,99,235,0.05);
+    }
+    .chart-card.cc-blue::before { background: linear-gradient(90deg, #2563eb, #60a5fa, #2563eb); }
+    .chart-card.cc-blue::after  { background: #2563eb; }
+    .chart-card.cc-blue:hover   { box-shadow: 0 6px 28px rgba(37,99,235,0.16); transform: translateY(-2px); }
+
+    .chart-card.cc-violet {
+        border: 1.5px solid rgba(124,58,237,0.22);
+        box-shadow: 0 2px 16px rgba(124,58,237,0.08), 0 1px 3px rgba(124,58,237,0.05);
+    }
+    .chart-card.cc-violet::before { background: linear-gradient(90deg, #7c3aed, #c084fc, #7c3aed); }
+    .chart-card.cc-violet::after  { background: #7c3aed; }
+    .chart-card.cc-violet:hover   { box-shadow: 0 6px 28px rgba(124,58,237,0.16); transform: translateY(-2px); }
+
+    .chart-card.cc-green {
+        border: 1.5px solid rgba(5,150,105,0.22);
+        box-shadow: 0 2px 16px rgba(5,150,105,0.08), 0 1px 3px rgba(5,150,105,0.05);
+    }
+    .chart-card.cc-green::before { background: linear-gradient(90deg, #059669, #34d399, #059669); }
+    .chart-card.cc-green::after  { background: #059669; }
+    .chart-card.cc-green:hover   { box-shadow: 0 6px 28px rgba(5,150,105,0.16); transform: translateY(-2px); }
+
+    .chart-card.cc-amber {
+        border: 1.5px solid rgba(217,119,6,0.22);
+        box-shadow: 0 2px 16px rgba(217,119,6,0.08), 0 1px 3px rgba(217,119,6,0.05);
+    }
+    .chart-card.cc-amber::before { background: linear-gradient(90deg, #d97706, #fbbf24, #d97706); }
+    .chart-card.cc-amber::after  { background: #d97706; }
+    .chart-card.cc-amber:hover   { box-shadow: 0 6px 28px rgba(217,119,6,0.16); transform: translateY(-2px); }
+
+    /* Overall / Issued cards */
+    .chart-card.cc-cyan {
+        border: 1.5px solid rgba(8,145,178,0.22);
+        box-shadow: 0 2px 16px rgba(8,145,178,0.08);
+    }
+    .chart-card.cc-cyan::before { background: linear-gradient(90deg, #0891b2, #67e8f9, #0891b2); }
+    .chart-card.cc-cyan::after  { background: #0891b2; }
+    .chart-card.cc-cyan:hover   { box-shadow: 0 6px 28px rgba(8,145,178,0.16); transform: translateY(-2px); }
+
+    .chart-card.cc-emerald {
+        border: 1.5px solid rgba(16,185,129,0.22);
+        box-shadow: 0 2px 16px rgba(16,185,129,0.08);
+    }
+    .chart-card.cc-emerald::before { background: linear-gradient(90deg, #10b981, #6ee7b7, #10b981); }
+    .chart-card.cc-emerald::after  { background: #10b981; }
+    .chart-card.cc-emerald:hover   { box-shadow: 0 6px 28px rgba(16,185,129,0.16); transform: translateY(-2px); }
+
+    .chart-card-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding-bottom: 0.7rem;
+        border-bottom: 1px solid rgba(180,140,220,0.15);
+        margin-bottom: 0.8rem;
+    }
+    .chart-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        box-shadow: 0 0 6px currentColor;
+    }
+    .chart-card-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #2d1520;
+        margin: 0;
+        flex: 1;
+        letter-spacing: -0.01em;
+    }
+    .chart-pill {
+        font-family: var(--mono);
+        font-size: 0.55rem;
+        font-weight: 600;
+        padding: 0.14rem 0.5rem;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+    }
+    .chart-pill.p-blue   { color: #2563eb; background: #eff6ff; border: 1px solid rgba(37,99,235,0.2); }
+    .chart-pill.p-violet { color: #7c3aed; background: #f5f3ff; border: 1px solid rgba(124,58,237,0.2); }
+    .chart-pill.p-green  { color: #059669; background: #ecfdf5; border: 1px solid rgba(5,150,105,0.2); }
+    .chart-pill.p-amber  { color: #d97706; background: #fffbeb; border: 1px solid rgba(217,119,6,0.2); }
+    .chart-pill.p-cyan   { color: #0891b2; background: #ecfeff; border: 1px solid rgba(8,145,178,0.2); }
+    .chart-pill.p-emerald{ color: #059669; background: #ecfdf5; border: 1px solid rgba(5,150,105,0.2); }
+
+    /* canvas sizing */
+    .pie-wrap    { width: 8rem;  height: 8rem;  margin: 0 auto; }
+    .pie-wrap-lg { width: 9.5rem; height: 9.5rem; margin: 0 auto; }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       RIGHT PANEL
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    .side-card {
+        background: #fff;
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+        transition: box-shadow 0.2s;
+        animation: fadeUp 0.45s ease 0.30s both;
+        border: 1.5px solid rgba(180,140,220,0.22);
+        box-shadow: 0 2px 14px rgba(120,80,200,0.07);
+        position: relative;
+    }
+    .side-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #4c6ef5, #f06eb0, #4c6ef5);
+        border-radius: 14px 14px 0 0;
+    }
+    .side-card:hover { box-shadow: 0 6px 24px rgba(76,110,245,0.14); }
+
+    .side-card-head {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(180,140,220,0.12);
+        background: linear-gradient(90deg, rgba(76,110,245,0.04), rgba(240,110,176,0.04));
+    }
+    .side-card-head-icon {
+        width: 28px; height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #eff6ff, #e0e7ff);
+        border: 1px solid rgba(37,99,235,0.18);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem;
+        color: #2563eb;
+    }
+    .side-card-head h6 {
+        font-size: 0.77rem;
+        font-weight: 700;
+        color: #2d1520;
+        margin: 0;
+        flex: 1;
+        letter-spacing: -0.01em;
+    }
+
+    /* Login list */
+    .login-list { list-style: none; margin: 0; padding: 0; }
+    .login-row {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.55rem 1rem;
+        border-bottom: 1px solid rgba(180,140,220,0.10);
+        transition: background 0.15s;
+    }
+    .login-row:last-child { border-bottom: none; }
+    .login-row:hover { background: #f4f8ff; }
+    .login-avatar {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4c6ef5, #2563eb);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.55rem; font-weight: 700; color: #fff;
+        flex-shrink: 0; font-family: var(--mono);
+    }
+    .login-name  { font-size: 0.77rem; font-weight: 600; color: #2d1520; }
+    .login-time  { font-family: var(--mono); font-size: 0.58rem; color: #7a5060; flex-shrink: 0; }
+
+    /* Login table */
+    .login-table-container { padding: 0.4rem; }
+    .login-table { width: 100%; font-size: 0.72rem; }
+    .login-table th {
+        background: linear-gradient(90deg, rgba(76,110,245,0.06), rgba(240,110,176,0.04));
+        font-weight: 600;
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.45rem 0.5rem;
+        border-bottom: 1px solid rgba(180,140,220,0.18);
+        color: #5534a0;
+        font-size: 0.6rem;
+    }
+    .login-table td {
+        padding: 0.38rem 0.5rem;
+        vertical-align: middle;
+        border-bottom: 1px solid rgba(180,140,220,0.08);
+        color: #2d1520;
+    }
+    .login-table tr:last-child td { border-bottom: none; }
+    .login-table .badge { font-size: 0.62rem; padding: 0.18rem 0.4rem; }
+
+    /* Issued table */
+    .issued-scroll { overflow-x: auto; }
+    .issued-table { width: 100%; border-collapse: collapse; }
+    .issued-table thead th {
+        padding: 0.45rem 1rem;
+        font-family: var(--mono);
+        font-size: 0.56rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #5534a0;
+        font-weight: 600;
+        border-bottom: 1px solid rgba(180,140,220,0.18);
+        background: linear-gradient(90deg, rgba(76,110,245,0.06), rgba(240,110,176,0.04));
+        text-align: left;
+        white-space: nowrap;
+    }
+    .issued-table tbody tr {
+        border-bottom: 1px solid rgba(180,140,220,0.08);
+        transition: background 0.15s;
+    }
+    .issued-table tbody tr:last-child { border-bottom: none; }
+    .issued-table tbody tr:hover { background: #f4f8ff; }
+    .issued-table td {
+        padding: 0.5rem 1rem;
+        color: #2d1520;
+        font-size: 0.74rem;
+        vertical-align: middle;
+    }
+    .issued-table td:first-child {
+        font-family: var(--mono);
+        font-size: 0.58rem;
+        color: #7a5060;
+        white-space: nowrap;
+    }
+    .asset-tag {
+        display: inline-block;
+        background: #eff6ff;
+        border: 1px solid rgba(37,99,235,0.2);
+        color: #2563eb;
+        font-family: var(--mono);
+        font-size: 0.55rem;
+        font-weight: 600;
+        padding: 0.08rem 0.35rem;
+        border-radius: 4px;
+        margin-right: 0.3rem;
+        letter-spacing: 0.02em;
+    }
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       ANIMATION
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<div class="dash-wrap">
+
+    <!-- Page Header -->
+    <div class="dash-header">
+        <div class="dash-header-left">
+            <h1>Dashboard</h1>
+            <p>Inventory overview &amp; analytics</p>
+        </div>
+        <div class="dash-live">
+            <span class="dash-live-dot"></span> LIVE
+        </div>
+    </div>
+
+    <!-- Stat Summary Strip -->
+    <div class="stat-strip">
+        <div class="stat-tile s-blue">
+            <div class="stat-tile-icon blue"><i class="bi bi-diagram-3"></i></div>
+            <div class="stat-tile-info">
+                <div class="stat-tile-label">Networking</div>
+                <div class="stat-tile-value" id="count-networking">—</div>
             </div>
         </div>
-        {% if show_right_panel %}
-        <div class="col-lg-4">
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h6 class="card-title">Recent logins</h6>
-                    <ul class="list-group list-group-flush">
-                        {% for u in recent_logins %}
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>{{ u.username }}</span>
-                            <span class="text-muted small">{{ u.last_login|date:"Y-m-d H:i" }}</span>
-                        </li>
-                        {% empty %}
-                        <li class="list-group-item text-muted">No logins yet.</li>
-                        {% endfor %}
-                    </ul>
+        <div class="stat-tile s-violet">
+            <div class="stat-tile-icon violet"><i class="bi bi-cpu"></i></div>
+            <div class="stat-tile-info">
+                <div class="stat-tile-label">Hardware</div>
+                <div class="stat-tile-value" id="count-hardware">—</div>
+            </div>
+        </div>
+        <div class="stat-tile s-green">
+            <div class="stat-tile-icon green"><i class="bi bi-shield-check"></i></div>
+            <div class="stat-tile-info">
+                <div class="stat-tile-label">Security</div>
+                <div class="stat-tile-value" id="count-security">—</div>
+            </div>
+        </div>
+        <div class="stat-tile s-amber">
+            <div class="stat-tile-icon amber"><i class="bi bi-server"></i></div>
+            <div class="stat-tile-info">
+                <div class="stat-tile-label">Server Parts</div>
+                <div class="stat-tile-value" id="count-server_parts">—</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scrollable body -->
+    <div class="dash-body">
+        <div class="row g-2">
+            <div class="{% if show_right_panel %}col-lg-8{% else %}col-lg-12{% endif %}">
+                <div class="row g-2">
+
+                    {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                    <!-- Admin: category charts -->
+                    <div class="col-md-6">
+                        <div class="chart-card cc-blue">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c1);color:var(--c1)"></span>
+                                <h6 class="chart-card-title">Networking</h6>
+                                <span class="chart-pill p-blue">CATEGORY</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_networking"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-violet">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c2);color:var(--c2)"></span>
+                                <h6 class="chart-card-title">Hardware</h6>
+                                <span class="chart-pill p-violet">CATEGORY</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_hardware"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-green">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c3);color:var(--c3)"></span>
+                                <h6 class="chart-card-title">Security</h6>
+                                <span class="chart-pill p-green">CATEGORY</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_security"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-amber">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c4);color:var(--c4)"></span>
+                                <h6 class="chart-card-title">Server Parts</h6>
+                                <span class="chart-pill p-amber">CATEGORY</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_server_parts"></canvas></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- User view -->
+                    <div class="col-md-6">
+                        <div class="chart-card cc-blue">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c1);color:var(--c1)"></span>
+                                <h6 class="chart-card-title">Networking</h6>
+                                <span class="chart-pill p-blue">ITEMS</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_user_networking"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-violet">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c2);color:var(--c2)"></span>
+                                <h6 class="chart-card-title">Hardware</h6>
+                                <span class="chart-pill p-violet">ITEMS</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_user_hardware"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-green">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c3);color:var(--c3)"></span>
+                                <h6 class="chart-card-title">Security</h6>
+                                <span class="chart-pill p-green">ITEMS</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_user_security"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="chart-card cc-amber">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c4);color:var(--c4)"></span>
+                                <h6 class="chart-card-title">Server Parts</h6>
+                                <span class="chart-pill p-amber">ITEMS</span>
+                            </div>
+                            <div class="pie-wrap"><canvas id="pie_user_server_parts"></canvas></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Overall & Issued -->
+                    <div class="col-lg-6">
+                        <div class="chart-card cc-cyan h-100">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c5);color:var(--c5)"></span>
+                                <h6 class="chart-card-title">Available Items by Category</h6>
+                                <span class="chart-pill p-cyan">OVERVIEW</span>
+                            </div>
+                            <div class="pie-wrap-lg"><canvas id="pie_overall"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="chart-card cc-emerald h-100">
+                            <div class="chart-card-head">
+                                <span class="chart-dot" style="background:var(--c3);color:var(--c3)"></span>
+                                <h6 class="chart-card-title">Issued Items by Category</h6>
+                                <span class="chart-pill p-emerald">ISSUED</span>
+                            </div>
+                            <div style="max-width:640px;margin-top:0.5rem;">
+                                <canvas id="line_issued_by_category" height="110"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">Recent issued items</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm mb-0">
+
+            {% if show_right_panel %}
+            <div class="col-lg-4">
+
+                <!-- Recent Logins -->
+                <div class="side-card">
+                    <div class="side-card-head">
+                        <div class="side-card-head-icon"><i class="bi bi-people"></i></div>
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        <h6>Recent Logins</h6>
+                        {% else %}
+                        <h6>My Recent Logins</h6>
+                        {% endif %}
+                    </div>
+                    <div class="login-table-container">
+                        <table class="login-table">
                             <thead>
                                 <tr>
-                                    <th>When</th>
-                                    <th>Item</th>
-                                    <th>To</th>
+                                    {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                                    <th>User</th>
+                                    {% endif %}
+                                    <th>Date</th>
+                                    <th>IP Address</th>
+                                    <th>Hostname</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for r in recent_issued %}
+                                {% for u in recent_logins %}
                                 <tr>
-                                    <td class="text-muted small">{{ r.issued_at|date:"Y-m-d H:i" }}</td>
-                                    <td>{{ r.product.asset_id }} — {{ r.product.item_name }}</td>
-                                    <td>{{ r.receiver.username|default:"-" }}</td>
+                                    {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="login-avatar">{{ u.user.username|slice:":2"|upper }}</div>
+                                            <span class="fw-semibold" style="font-size:.72rem">{{ u.user.username }}</span>
+                                        </div>
+                                    </td>
+                                    {% endif %}
+                                    <td>{{ u.logged_in_at|date:"M d, H:i" }}</td>
+                                    <td>
+                                        {% if u.ip_address %}
+                                        <span class="badge bg-success">{{ u.ip_address }}</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if u.hostname %}
+                                        <span class="badge bg-info">{{ u.hostname }}</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="3" class="text-muted">No issues yet.</td></tr>
+                                <tr>
+                                    <td colspan="{% if user.stage == 1 or user.stage == 2 or user.is_superuser %}4{% else %}3{% endif %}" class="text-center text-muted py-3">
+                                        <small>No recent logins found.</small>
+                                    </td>
+                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+
+                <!-- Recent Issued Items -->
+                <div class="side-card">
+                    <div class="side-card-head">
+                        <div class="side-card-head-icon"><i class="bi bi-box-arrow-right"></i></div>
+                        {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                        <h6>Recent Issued Items</h6>
+                        {% else %}
+                        <h6>Items Issued to You</h6>
+                        {% endif %}
+                    </div>
+                    <div class="issued-scroll">
+                        <table class="issued-table">
+                            <thead>
+                                <tr>
+                                    <th>When</th>
+                                    <th>Item</th>
+                                    {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                                    <th>From</th>
+                                    <th>To</th>
+                                    {% else %}
+                                    <th>Issued By</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in recent_issued %}
+                                <tr>
+                                    <td>{{ r.issued_at|date:"M d, H:i" }}</td>
+                                    <td>
+                                        <span class="asset-tag">{{ r.product.asset_id }}</span>
+                                        {{ r.product.item_name }}
+                                    </td>
+                                    {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
+                                    <td>{{ r.issued_by.username|default:"—" }}</td>
+                                    <td>{{ r.receiver.username|default:"—" }}</td>
+                                    {% else %}
+                                    <td>{{ r.issued_by.username|default:"—" }}</td>
+                                    {% endif %}
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="{% if user.stage == 1 or user.stage == 2 or user.is_superuser %}4{% else %}3{% endif %}" class="text-center text-muted py-3">
+                                        <small>No issues yet.</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
+            {% endif %}
         </div>
-        {% endif %}
-    </div>
-</div>
+    </div><!-- /dash-body -->
+
+</div><!-- /dash-wrap -->
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-(function(){
-    const overall = {{ overall_pie_json|safe }};
+(function () {
+    const overall     = {{ overall_pie_json|safe }};
     const perCategory = {{ per_category_json|safe }};
+    const typeCounts  = {{ type_counts_json|safe }};
+    const issuedByCat = {{ issued_by_category_json|safe }};
 
-    function makePie(elId, series) {
+    const PALETTE = [
+        '#2563eb','#7c3aed','#059669','#d97706',
+        '#0891b2','#dc2626','#0d9488','#9333ea',
+        '#ca8a04','#16a34a'
+    ];
+
+    Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+    Chart.defaults.font.size   = 10;
+    Chart.defaults.color       = '#94a3b8';
+
+    const TOOLTIP_OPTS = {
+        backgroundColor : '#ffffff',
+        borderColor     : '#e2e8f0',
+        borderWidth     : 1,
+        titleColor      : '#0f172a',
+        bodyColor       : '#64748b',
+        padding         : 10,
+        cornerRadius    : 10,
+        titleFont       : { weight: '700', size: 11 },
+        bodyFont        : { size: 10 },
+    };
+
+    function makePie(elId, series, hideValue = false) {
         const ctx = document.getElementById(elId);
         if (!ctx) return;
-        if (!series || series.length === 0) {
-            series = [{ label: 'No data', value: 1 }];
-        }
-        const colors = [
-            '#4da6ff', '#6c5ce7', '#00b894', '#fdcb6e', '#ff7675', '#00cec9',
-            '#e17055', '#0984e3', '#2d3436', '#b2bec3'
-        ];
+        const data = (series && series.length) ? series : [{ label: 'No data', value: 1 }];
+        const tooltipCallback = hideValue ? {
+            label: function(context) { return context.label || ''; }
+        } : {
+            label: function(context) { return `${context.label}: ${context.raw}`; }
+        };
         new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                labels: (series || []).map(s => s.label),
+                labels  : data.map(s => s.label),
                 datasets: [{
-                    data: (series || []).map(s => s.value),
-                    backgroundColor: colors
+                    data           : data.map(s => s.value),
+                    backgroundColor: PALETTE,
+                    borderColor    : '#ffffff',
+                    borderWidth    : 3,
+                    hoverOffset    : 6,
+                    hoverBorderWidth: 3,
                 }]
             },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            options: {
+                responsive      : true,
+                cutout          : '60%',
+                plugins: {
+                    legend  : { display: false },
+                    tooltip : { ...TOOLTIP_OPTS, callbacks: tooltipCallback },
+                },
+                animation: { animateRotate: true, duration: 800, easing: 'easeInOutQuart' },
+            }
         });
     }
 
-    makePie('pie_networking', perCategory.networking || []);
-    makePie('pie_hardware', perCategory.hardware || []);
-    makePie('pie_security', perCategory.security || []);
+    makePie('pie_networking',   perCategory.networking   || []);
+    makePie('pie_hardware',     perCategory.hardware     || []);
+    makePie('pie_security',     perCategory.security     || []);
     makePie('pie_server_parts', perCategory.server_parts || []);
-    makePie('pie_overall', overall || []);
+
+    {% if user.stage == 3 %}
+    makePie('pie_user_networking',   {{ user_category_data.networking_items|safe }},   true);
+    makePie('pie_user_hardware',     {{ user_category_data.hardware_items|safe }},     true);
+    makePie('pie_user_security',     {{ user_category_data.security_items|safe }},     true);
+    makePie('pie_user_server_parts', {{ user_category_data.server_parts_items|safe }}, true);
+    {% endif %}
+
+    const overallByCount = [
+        { label: 'Networking',   value: (perCategory.networking   || []).length },
+        { label: 'Hardware',     value: (perCategory.hardware     || []).length },
+        { label: 'Security',     value: (perCategory.security     || []).length },
+        { label: 'Server Parts', value: (perCategory.server_parts || []).length },
+    ];
+    makePie('pie_overall', overallByCount);
+
+    function setCount(id, seriesKey) {
+        const el = document.getElementById('count-' + id);
+        if (!el) return;
+        const val = Number((typeCounts && typeCounts[seriesKey] !== undefined) ? typeCounts[seriesKey] : 0) || 0;
+        el.textContent = val.toLocaleString();
+    }
+    setCount('networking',   'networking');
+    setCount('hardware',     'hardware');
+    setCount('security',     'security');
+    setCount('server_parts', 'server_parts');
+
+    (function () {
+        const el = document.getElementById('line_issued_by_category');
+        if (!el || !issuedByCat) return;
+        new Chart(el, {
+            type: 'line',
+            data: {
+                labels  : issuedByCat.map(s => s.label),
+                datasets: [{
+                    data           : issuedByCat.map(s => s.value),
+                    borderColor    : '#059669',
+                    backgroundColor: 'rgba(5,150,105,0.10)',
+                    tension        : 0.35,
+                    fill           : true,
+                    pointRadius    : 3,
+                    pointBackgroundColor: '#059669',
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend : { display: false },
+                    tooltip: TOOLTIP_OPTS,
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+    })();
 })();
 </script>
+
 {% endblock %}

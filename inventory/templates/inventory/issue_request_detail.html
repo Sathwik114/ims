@@ -1,0 +1,415 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}Request #{{ issue_request.request_id }} - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-header">
+        <div class="header-content">
+            <h1>Issue Request #{{ issue_request.request_id }}</h1>
+            <div class="header-actions">
+                <a href="{% url 'inventory:issue_requests' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Requests
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-wrapper">
+        <div class="request-detail-container">
+            <!-- Status Badge -->
+            <div class="status-section">
+                <span class="status-badge status-{{ issue_request.status }}">
+                    {{ issue_request.get_status_display }}
+                </span>
+                <p class="status-message">
+                    {% if issue_request.status == 'pending' %}
+                        Your request is pending approval from Stage 1/2 users.
+                    {% elif issue_request.status == 'approved' %}
+                        Your request has been approved. {% if issue_request.approved_quantity != issue_request.quantity %}({{ issue_request.approved_quantity }} of {{ issue_request.quantity }} items approved){% endif %}
+                    {% elif issue_request.status == 'rejected' %}
+                        Your request has been rejected.
+                    {% elif issue_request.status == 'issued' %}
+                        Your requested items have been issued to you.
+                    {% endif %}
+                </p>
+            </div>
+
+            <!-- Request Details -->
+            <div class="detail-card">
+                <h3>Request Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Request ID:</label>
+                        <span>#{{ issue_request.request_id }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Requested By:</label>
+                        <span>{{ issue_request.requested_by.get_full_name|default:issue_request.requested_by.username }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Email:</label>
+                        <span>{{ issue_request.requested_by.email }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Mobile:</label>
+                        <span>{{ issue_request.requested_by_mobile|default:"-" }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Submitted:</label>
+                        <span>{{ issue_request.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Status:</label>
+                        <span class="status-text status-{{ issue_request.status }}">{{ issue_request.get_status_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Item Details -->
+            <div class="detail-card">
+                <h3>Item Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Asset ID:</label>
+                        <span>{{ issue_request.product.asset_id }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Item Name:</label>
+                        <span>{{ issue_request.product.item_name }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Category:</label>
+                        <span>{{ issue_request.product.get_category_display }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Location:</label>
+                        <span>{{ issue_request.product.computed_location|default:"-" }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Quantity Requested:</label>
+                        <span>{{ issue_request.quantity }}</span>
+                    </div>
+                    {% if issue_request.approved_quantity %}
+                    <div class="detail-item">
+                        <label>Quantity Approved:</label>
+                        <span>{{ issue_request.approved_quantity }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Request Reason -->
+            {% if issue_request.request_reason %}
+            <div class="detail-card">
+                <h3>Request Reason</h3>
+                <div class="reason-text">
+                    {{ issue_request.request_reason|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Approval/Rejection Information -->
+            {% if issue_request.status == 'approved' or issue_request.status == 'rejected' %}
+            <div class="detail-card">
+                <h3>{% if issue_request.status == 'approved' %}Approval{% else %}Rejection{% endif %} Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>{% if issue_request.status == 'approved' %}Approved{% else %}Rejected{% endif %} By:</label>
+                        <span>
+                            {% if issue_request.status == 'approved' %}
+                                {{ issue_request.approved_by.get_full_name|default:issue_request.approved_by.username }}
+                            {% else %}
+                                {{ issue_request.rejected_by.get_full_name|default:issue_request.rejected_by.username }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <label>{% if issue_request.status == 'approved' %}Approved{% else %}Rejected{% endif %} At:</label>
+                        <span>
+                            {% if issue_request.status == 'approved' %}
+                                {{ issue_request.approved_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                {{ issue_request.rejected_at|date:"Y-m-d H:i" }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                {% if issue_request.approval_note %}
+                <div class="approval-note">
+                    <label>Approval Note:</label>
+                    <div class="note-text">{{ issue_request.approval_note|linebreaks }}</div>
+                </div>
+                {% endif %}
+                
+                {% if issue_request.rejection_reason %}
+                <div class="rejection-reason">
+                    <label>Rejection Reason:</label>
+                    <div class="reason-text">{{ issue_request.rejection_reason|linebreaks }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Issued Information -->
+            {% if issue_request.status == 'issued' %}
+            <div class="detail-card">
+                <h3>Issued Information</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <label>Issued By:</label>
+                        <span>{{ issue_request.issued_by.get_full_name|default:issue_request.issued_by.username }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Issued At:</label>
+                        <span>{{ issue_request.issued_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons for Admins -->
+            {% if user.can_approve_issue_requests %}
+            <div class="action-section">
+                {% if issue_request.status == 'pending' %}
+                <div class="action-buttons">
+                    <form method="post" action="{% url 'inventory:issue_request_approve' issue_request.pk %}" class="action-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="approved_quantity">Approved Quantity:</label>
+                            <input type="number" name="approved_quantity" id="approved_quantity" 
+                                   value="{{ issue_request.quantity }}" min="1" max="{{ issue_request.quantity }}" required>
+                        </div>
+                        {% if issue_request.quantity > 1 %}
+                        <div class="form-group">
+                            <label for="partial_reason">Partial Approval Reason (if approving less than requested):</label>
+                            <textarea name="partial_reason" id="partial_reason" rows="2"></textarea>
+                        </div>
+                        {% endif %}
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </button>
+                    </form>
+                    
+                    <form method="post" action="{% url 'inventory:issue_request_reject' issue_request.pk %}" class="action-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="reason">Rejection Reason:</label>
+                            <textarea name="reason" id="reason" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                    </form>
+                </div>
+                {% elif issue_request.status == 'approved' %}
+                <form method="post" action="{% url 'inventory:issue_request_issue' issue_request.pk %}" class="action-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-box-seam"></i> Mark as Issued
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.request-detail-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.status-section {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 14px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.status-pending { background-color: #fef3c7; color: #92400e; }
+.status-approved { background-color: #d1fae5; color: #065f46; }
+.status-rejected { background-color: #fee2e2; color: #991b1b; }
+.status-issued { background-color: #dbeafe; color: #1e40af; }
+
+.status-message {
+    color: #6b7280;
+    font-size: 16px;
+    margin: 0;
+}
+
+.detail-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.detail-card h3 {
+    margin: 0 0 1rem 0;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item label {
+    font-weight: 600;
+    color: #374151;
+    margin: 0;
+}
+
+.detail-item span {
+    color: #6b7280;
+    text-align: right;
+}
+
+.status-text {
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.reason-text, .note-text {
+    background-color: #f9fafb;
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid #3b82f6;
+    margin-top: 0.5rem;
+}
+
+.rejection-reason .reason-text {
+    border-left-color: #ef4444;
+}
+
+.approval-note .note-text {
+    border-left-color: #10b981;
+}
+
+.action-section {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.action-form {
+    background: #f9fafb;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    min-width: 300px;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-success {
+    background-color: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #059669;
+}
+
+.btn-danger {
+    background-color: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
+.btn-primary {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
+}
+
+.btn-secondary {
+    background-color: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #4b5563;
+}
+</style>
+{% endblock %}

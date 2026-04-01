@@ -1,0 +1,245 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Request Item{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Request Item</h5>
+
+    <!-- Request Form -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="card-title">Request an item</h6>
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="request">
+                <input type="hidden" name="asset_id" id="req_asset_id" value="">
+                <div class="row g-2">
+                    <div class="col-md-5" style="position:relative;">
+                        <label class="form-label">Asset ID / Item Code / Name</label>
+                        <input class="form-control" id="req_search_input" autocomplete="off" placeholder="Start typing to search...">
+                        <div id="req_suggestions" class="list-group" style="position:absolute; z-index:20; max-height:220px; overflow-y:auto; display:none;"></div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Quantity</label>
+                        {{ form.quantity }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Reason</label>
+                        {{ form.reason }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Upload file</label>
+                        {{ form.attachment }}
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btn_request" disabled>Submit request</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- My Requests -->
+    <div class="card">
+        <div class="card-body">
+            <h6 class="card-title">My requests (All Status)</h6>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="sticky-top bg-white">
+                        <tr>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Your Dept|Section</th>
+                            <th>Status</th>
+                            <th>Approved by</th>
+                            <th>Issued by</th>
+                            <th>Confirmed by</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in my_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td>
+                                {% if ir.requested_by_department %}
+                                    {{ ir.get_requested_by_department_display }}<br>
+                                    <span class="text-muted small">{{ ir.get_requested_by_section_display|default:"-" }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'secondary' if ir.status == 'pending' else
+                                    'success' if ir.status == 'approved' else
+                                    'primary' if ir.status == 'issued' else
+                                    'info' if ir.status == 'confirmed' else
+                                    'danger'
+                                }}">
+                                    {{ ir.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if ir.approved_by %}
+                                    {{ ir.approved_by.username }}
+                                    {% if ir.approved_by_full_name %}<br><span class="text-muted small">{{ ir.approved_by_full_name }}</span>{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ir.issued_by %}
+                                    {{ ir.issued_by.username }}
+                                    {% if ir.issued_by_full_name %}<br><span class="text-muted small">{{ ir.issued_by_full_name }}</span>{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ir.confirmed_by %}
+                                    {{ ir.confirmed_by.username }}
+                                    {% if ir.confirmed_by_full_name %}<br><span class="text-muted small">{{ ir.confirmed_by_full_name }}</span>{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ir.status == 'issued' %}
+                                    <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}" class="d-inline">{% csrf_token %}
+                                        <button class="btn btn-sm btn-success" type="submit" onclick="return confirm('Confirm receipt of this item?')">
+                                            Confirm
+                                        </button>
+                                    </form>
+                                {% elif ir.status == 'confirmed' %}
+                                    <span class="badge bg-info">Confirmed</span>
+                                {% elif ir.status == 'pending' %}
+                                    <span class="badge bg-secondary">Pending</span>
+                                {% elif ir.status == 'approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="9" class="text-muted">No requests yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Confirmation Pending -->
+    {% if issued_requests %}
+    <div class="card mb-3 border-warning">
+        <div class="card-body">
+            <h6 class="card-title">Items issued to you (Confirmation pending)</h6>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="sticky-top bg-white">
+                        <tr>
+                            <th>Issued Date/Time</th>
+                            <th>Asset ID</th>
+                            <th>Item Name</th>
+                            <th>Quantity</th>
+                            <th>Issued by</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ir in issued_requests %}
+                        <tr>
+                            <td class="text-muted small">{{ ir.issued_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ ir.product.asset_id }}</td>
+                            <td>{{ ir.product.item_name }}</td>
+                            <td>{{ ir.quantity }}</td>
+                            <td>{{ ir.issued_by.username }}</td>
+                            <td>
+                                <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}" class="d-inline">{% csrf_token %}
+                                    <button class="btn btn-sm btn-success" type="submit" onclick="return confirm('Confirm receipt of this item?')">
+                                        Confirm Receipt
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-muted">No items issued to you.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('req_search_input');
+    const suggestionsDiv = document.getElementById('req_suggestions');
+    const assetIdInput = document.getElementById('req_asset_id');
+    const submitBtn = document.getElementById('btn_request');
+    let debounceTimer;
+
+    if (!searchInput) return;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            assetIdInput.value = '';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/api/products/search-internal/?q=${encodeURIComponent(query)}&category={{ category }}`)
+                .then(response => response.json())
+                .then(data => {
+                    suggestionsDiv.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(product => {
+                            const item = document.createElement('a');
+                            item.href = '#';
+                            item.className = 'list-group-item list-group-item-action';
+                            item.innerHTML = `
+                                <div class="fw-bold">${product.asset_id}</div>
+                                <div class="small text-muted">${product.item_code} - ${product.item_name}</div>
+                                <div class="small text-success">Available: ${product.quantity_available}</div>
+                            `;
+                            item.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                searchInput.value = `${product.asset_id} - ${product.item_name}`;
+                                assetIdInput.value = product.asset_id;
+                                suggestionsDiv.style.display = 'none';
+                                submitBtn.disabled = false;
+                            });
+                            suggestionsDiv.appendChild(item);
+                        });
+                        suggestionsDiv.style.display = 'block';
+                    } else {
+                        suggestionsDiv.innerHTML = '<div class="list-group-item text-muted">No items found</div>';
+                        suggestionsDiv.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    suggestionsDiv.style.display = 'none';
+                });
+        }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Delete Item - {{ product.asset_id }}{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Confirm Deletion
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Warning:</strong> You are about to delete the following item. This action cannot be undone.
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Item Details:</h6>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td><strong>Asset ID:</strong></td>
+                                <td>{{ product.asset_id }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Item Code:</strong></td>
+                                <td>{{ product.item_code|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Item Name:</strong></td>
+                                <td>{{ product.item_name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Category:</strong></td>
+                                <td>{{ product.get_category_display }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Location:</strong></td>
+                                <td>{{ product.computed_location|default:product.location|default:"—" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Quantity:</strong></td>
+                                <td>{{ product.quantity_available }}</td>
+                            </tr>
+                            {% if product.price %}
+                            <tr>
+                                <td><strong>Price:</strong></td>
+                                <td>₹{{ product.price }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.deletion_reason.id_for_label }}" class="form-label fw-bold">
+                                Deletion Reason <span class="text-danger">*</span>
+                            </label>
+                            {{ form.deletion_reason }}
+                            {% if form.deletion_reason.help_text %}
+                            <div class="form-text text-muted">{{ form.deletion_reason.help_text }}</div>
+                            {% endif %}
+                            {% if form.deletion_reason.errors %}
+                            <div class="text-danger">
+                                {% for error in form.deletion_reason.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash me-1"></i>
+                                Delete Item
+                            </button>
+                            <a href="{% url 'inventory:view_items' %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle me-1"></i>
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

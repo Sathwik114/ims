@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User, Category, Rack, Product,
-    IssueRequest, IssueHistory, UploadHistory, Order, Notification, ManagementUploadRequest
+    IssueRequest, IssueHistory, UploadHistory, Order, ManagementUploadRequest
 )
 
 
@@ -58,12 +58,6 @@ class UploadHistoryAdmin(admin.ModelAdmin):
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['product', 'quantity_requested', 'quantity_provided', 'unit_price', 'total_cost_requested', 'total_cost_provided', 'status', 'requested_by', 'created_at']
     list_filter = ['status', 'created_at']
-
-
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ['recipient', 'title', 'kind', 'read', 'created_at']
-    list_filter = ['read', 'created_at']
 
 
 @admin.register(ManagementUploadRequest)

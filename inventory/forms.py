@@ -1,8 +1,22 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Product, Rack, Order, CATEGORY_CHOICES, MEASUREMENT_UNIT_CHOICES
+from .models import Product, Rack, Order, CATEGORY_CHOICES, MEASUREMENT_UNIT_CHOICES, ADMIN_SECTION_CHOICES, DEPARTMENT_SECTIONS, DEPARTMENT_CHOICES
 
 User = get_user_model()
+
+
+class DeletionReasonForm(forms.Form):
+    """Form to capture deletion reason when deleting items."""
+    deletion_reason = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Please provide a reason for deleting this item...'
+        }),
+        required=True,
+        max_length=500,
+        help_text="This reason will be stored in the deleted history for audit purposes."
+    )
 
 
 class LoginForm(forms.Form):
@@ -87,7 +101,19 @@ class AddRackForm(forms.ModelForm):
         }
 
 class IssueRequestForm(forms.Form):
-    quantity = forms.IntegerField(min_value=1, initial=1, widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    quantity = forms.IntegerField(
+        min_value=1,
+        initial=1,
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    )
+    reason = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Reason for this request'}),
+    )
+    attachment = forms.FileField(
+        required=True,
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'required': True})
+    )
 
 
 class UploadQuantityForm(forms.Form):
@@ -103,24 +129,69 @@ class OrderFulfillForm(forms.Form):
 
 
 class AddUserForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}), min_length=8)
-    stage = forms.ChoiceField(choices=[(2, 'Stage 2'), (3, 'Stage 3')], widget=forms.Select(attrs={'class': 'form-control'}))
-    full_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
-    mobile_number = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control'}))
+    stage = forms.ChoiceField(choices=[(1, 'Stage 1'), (2, 'Stage 2'), (3, 'Stage 3')], widget=forms.Select(attrs={'class': 'form-control'}))
+    mobile_number = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    full_name = forms.CharField(max_length=200, required=True, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter full name'}))
+    department = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': True})
+    )
+    section = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'readonly': True})
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'full_name', 'mobile_number', 'stage']
+        fields = ['username', 'email', 'full_name', 'mobile_number', 'stage', 'department', 'section']
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'username': forms.TextInput(attrs={'class': 'form-control', 'id': 'username-field'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'id': 'email-field', 'readonly': True}),
             'mobile_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].widget.attrs.update({
+            'placeholder': 'Enter username (will auto-generate email)'
+        })
+        self.fields['email'].help_text = 'Email will be auto-generated as username@gti.nws.cn'
+        self.fields['full_name'].widget.attrs.update({
+            'placeholder': 'Enter full name'
+        })
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError('Username already exists. Please choose a different username.')
+        return username
+
+    def clean_full_name(self):
+        full_name = self.cleaned_data.get('full_name')
+        if not full_name:
+            raise forms.ValidationError('Full name is required.')
+        return full_name
+
+    def clean(self):
+        cleaned_data = super().clean()
+        stage = cleaned_data.get('stage')
+        department = cleaned_data.get('department')
+        section = cleaned_data.get('section')
+        
+        # No special validation needed - department and section are optional
+        # They will be filled from MSSQL data
+        return cleaned_data
+
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_password(self.cleaned_data['password'])
+        
+        # Set email if not provided
+        if not user.email and user.username:
+            user.email = f"{user.username}@gti.nws.cn"
+        
+        # Set a default password (can be changed later)
+        user.set_password('temp123456')
+        
         if commit:
             user.save()
         return user

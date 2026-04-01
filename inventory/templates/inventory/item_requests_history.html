@@ -1,91 +1,687 @@
 {% extends 'inventory/base.html' %}
+
 {% block title %}Item Requests - Issued History{% endblock %}
+
+{% block extra_css %}
+
+<style>
+
+.btn-yellow {
+
+    background-color: #ffc107 !important;
+
+    border-color: #ffc107 !important;
+
+    color: #000 !important;
+
+}
+
+.btn-yellow:hover {
+
+    background-color: #e0a800 !important;
+
+    border-color: #d39e00 !important;
+
+}
+
+
+
+/* Hide print-only status label on screen */
+
+.print-status {
+
+    display: none;
+
+}
+
+
+
+/* ── Screen-only: compact & scrollable table ── */
+
+.table {
+
+    font-size: 12px !important;
+
+}
+
+.table th,
+
+.table td {
+
+    padding: 4px 6px !important;
+
+    vertical-align: middle !important;
+
+    white-space: nowrap !important;
+
+}
+
+/* Reason columns — fixed height with vertical scrollbar */
+
+.table td:nth-child(9),
+
+.table td:nth-child(12) {
+
+    white-space: normal !important;
+
+    max-width: 150px !important;
+
+    min-width: 80px !important;
+
+    word-break: break-word !important;
+
+}
+
+.reason-scroll {
+
+    display: block;
+
+    height: 56px;
+
+    overflow-y: scroll;
+
+    overflow-x: hidden;
+
+    word-break: break-word;
+
+    white-space: normal;
+
+    line-height: 1.4;
+
+    scrollbar-width: thin;
+
+    scrollbar-color: #adb5bd transparent;
+
+}
+
+.reason-scroll::-webkit-scrollbar       { width: 5px; }
+
+.reason-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+
+.reason-scroll::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 3px; }
+
+.reason-scroll::-webkit-scrollbar-thumb:hover { background: #6c757d; }
+
+/* Scrollable horizontally and vertically */
+
+.table-responsive {
+
+    overflow-x: auto !important;
+
+    max-height: 75vh !important;
+
+    overflow-y: auto !important;
+
+}
+
+/* Sticky header while scrolling */
+
+.table thead th {
+
+    position: sticky !important;
+
+    top: 0 !important;
+
+    z-index: 2 !important;
+
+    background-color: #f8f9fa !important;
+
+    font-size: 11px !important;
+
+}
+
+
+
+@media print {
+
+
+
+    /* ── Hide unwanted elements ── */
+
+    form.row,
+
+    .d-flex.gap-2,
+
+    .no-print {
+
+        display: none !important;
+
+    }
+
+
+
+    /* Hide "File" (last col) and "Confirmed By" (col 13) */
+
+    thead tr th:last-child,
+
+    tbody tr td:last-child,
+
+    thead tr th:nth-child(13),
+
+    tbody tr td:nth-child(13) {
+
+        display: none !important;
+
+    }
+
+
+
+    /* ── Status: hide button/badge, show print label ── */
+
+    .btn, .badge {
+
+        display: none !important;
+
+    }
+
+    .print-status {
+
+        display: inline-block !important;
+
+        padding: 2px 6px !important;
+
+        border-radius: 3px !important;
+
+        font-size: 8px !important;
+
+        font-weight: 700 !important;
+
+        -webkit-print-color-adjust: exact !important;
+
+        print-color-adjust: exact !important;
+
+    }
+
+    .print-status-pending   { background-color: #ffc107 !important; color: #000 !important; }
+
+    .print-status-approved  { background-color: #ffc107 !important; color: #000 !important; }
+
+    .print-status-rejected  { background-color: #dc3545 !important; color: #fff !important; }
+
+    .print-status-issued    { background-color: #198754 !important; color: #fff !important; }
+
+    .print-status-confirmed { background-color: #0dcaf0 !important; color: #000 !important; }
+
+
+
+    /* ── Layout reset ── */
+
+    * { box-sizing: border-box !important; }
+
+
+
+    .container-fluid {
+
+        width: 100% !important;
+
+        padding: 0 !important;
+
+        margin: 0 !important;
+
+    }
+
+
+
+    .table-responsive {
+
+        overflow: visible !important;
+
+        max-height: none !important;
+
+    }
+
+
+
+    /* Reset reason scroll for print — show full text */
+
+    .reason-scroll {
+
+        display: block !important;
+
+        height: auto !important;
+
+        overflow: visible !important;
+
+    }
+
+
+
+    /* ── Table ── */
+
+    table {
+
+        width: 100% !important;
+
+        border-collapse: collapse !important;
+
+        table-layout: auto !important;   /* let browser size columns naturally */
+
+        font-size: 7.5px !important;
+
+    }
+
+
+
+    /* ── All cells ── */
+
+    th, td {
+
+        border: 1px solid #aaa !important;
+
+        padding: 3px 4px !important;
+
+        white-space: normal !important;
+
+        word-break: break-word !important;
+
+        vertical-align: top !important;
+
+    }
+
+
+
+    /* ── Header row ── */
+
+    thead th {
+
+        background-color: #e9ecef !important;
+
+        -webkit-print-color-adjust: exact !important;
+
+        print-color-adjust: exact !important;
+
+        font-size: 7.5px !important;
+
+        font-weight: 700 !important;
+
+        text-align: center !important;
+
+        vertical-align: middle !important;
+
+    }
+
+
+
+    /* ── Sticky header off for print ── */
+
+    thead th {
+
+        position: static !important;
+
+    }
+
+
+
+    /* ── Give reason cols a % width cap so they wrap, not stretch ── */
+
+    /* col 9 = Reason for Request, col 12 = Reject Reason */
+
+    thead tr th:nth-child(9),  tbody tr td:nth-child(9),
+
+    thead tr th:nth-child(12), tbody tr td:nth-child(12) {
+
+        width: 9% !important;
+
+    }
+
+
+
+    /* Narrow fixed cols */
+
+    thead tr th:nth-child(7),  tbody tr td:nth-child(7)  { width: 6% !important; }  /* Mobile */
+
+    thead tr th:nth-child(8),  tbody tr td:nth-child(8)  { width: 4% !important; }  /* Qty */
+
+    thead tr th:nth-child(16), tbody tr td:nth-child(16) { width: 6% !important; }  /* Status */
+
+
+
+    /* Date cols — allow wrapping between date and time */
+
+    thead tr th:nth-child(2),  tbody tr td:nth-child(2),
+
+    thead tr th:nth-child(15), tbody tr td:nth-child(15) {
+
+        width: 7% !important;
+
+        word-break: break-all !important;
+
+    }
+
+
+
+    /* ── Page ── */
+
+    @page {
+
+        size: A4 landscape;
+
+        margin: 8mm;
+
+    }
+
+
+
+    tr { page-break-inside: avoid; }
+
+}
+
+</style>
+
+{% endblock %}
+
 {% block content %}
+
 <div class="container-fluid">
+
     <div class="d-flex align-items-center justify-content-between mb-3">
+
         <h5 class="mb-0">Item Requests – History</h5>
+
         <div class="d-flex gap-2">
+
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
+
             <a class="btn btn-outline-primary btn-sm"
+
                href="{% url 'inventory:item_requests_history_pdf' %}?asset_id={{ asset_id }}&from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">
+
                 Download PDF
+
             </a>
+
+            <a class="btn btn-outline-success btn-sm"
+
+               href="{% url 'inventory:item_requests_history_excel' %}?asset_id={{ asset_id }}&from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">
+
+                Download Excel
+
+            </a>
+
         </div>
+
     </div>
+
+
 
     <form method="get" class="row g-2 mb-3">
+
         <div class="col-auto">
+
             <input type="text" name="asset_id" class="form-control" placeholder="Asset ID" value="{{ asset_id }}">
+
         </div>
+
         <div class="col-auto">
+
             <input type="date" name="from" class="form-control" value="{{ from_date }}" placeholder="From">
+
         </div>
+
         <div class="col-auto">
+
             <input type="date" name="to" class="form-control" value="{{ to_date }}" placeholder="To">
+
         </div>
+
         <div class="col-auto">
+
             <select name="month" class="form-select">
+
                 <option value="">All months</option>
+
                 <option value="1" {% if search_month == "1" %}selected{% endif %}>January</option>
+
                 <option value="2" {% if search_month == "2" %}selected{% endif %}>February</option>
+
                 <option value="3" {% if search_month == "3" %}selected{% endif %}>March</option>
+
                 <option value="4" {% if search_month == "4" %}selected{% endif %}>April</option>
+
                 <option value="5" {% if search_month == "5" %}selected{% endif %}>May</option>
+
                 <option value="6" {% if search_month == "6" %}selected{% endif %}>June</option>
+
                 <option value="7" {% if search_month == "7" %}selected{% endif %}>July</option>
+
                 <option value="8" {% if search_month == "8" %}selected{% endif %}>August</option>
+
                 <option value="9" {% if search_month == "9" %}selected{% endif %}>September</option>
+
                 <option value="10" {% if search_month == "10" %}selected{% endif %}>October</option>
+
                 <option value="11" {% if search_month == "11" %}selected{% endif %}>November</option>
+
                 <option value="12" {% if search_month == "12" %}selected{% endif %}>December</option>
+
             </select>
+
         </div>
+
         <div class="col-auto">
+
             <button type="submit" class="btn btn-primary">Filter</button>
+
         </div>
+
     </form>
 
+
+
     <div class="card">
+
         <div class="card-body">
+
             <div class="table-responsive">
+
                 <table class="table table-hover align-middle mb-0">
+
                     <thead>
+
                         <tr>
-                            <th>Date &amp; time</th>
+
+                            <th>Request ID</th>
+
+                            <th>Requested Date/Time</th>
+
                             <th>Asset ID</th>
-                            <th>Item</th>
+
+                            <th>Item Name</th>
+
                             <th>User</th>
+
+                            <th>User Dept|Section</th>
+
                             <th>Mobile</th>
-                            <th>Qty</th>
+
+                            <th>Quantity</th>
+
+                            <th>Reason for Request</th>
+
+                            <th>Approved By</th>
+
+                            <th>Rejected By</th>
+
+                            <th>Reject Reason</th>
+
+                            <th>Issued By</th>
+
+                            <th>Confirmed By</th>
+
+                            <th>Confirmed DateTime</th>
+
                             <th>Status</th>
-                            <th>Approved by</th>
-                            <th>Rejected by</th>
-                            <th>Reason</th>
-                            <th>Issued by</th>
+
+                            <th>File</th>
+
                         </tr>
+
                     </thead>
+
                     <tbody>
-                        {% for r in records %}
+
+                        {% for ir in confirmed_requests %}
+
                         <tr>
-                            <td class="text-muted small">{{ r.created_at|date:"Y-m-d H:i" }}</td>
-                            <td>{{ r.product.asset_id }}</td>
-                            <td>{{ r.product.item_name }}</td>
-                            <td>{{ r.requested_by_full_name|default:r.requested_by.username|default:"-" }}</td>
-                            <td>{{ r.requested_by_mobile|default:"-" }}</td>
-                            <td>{{ r.quantity }}</td>
-                            <td>{{ r.get_status_display }}</td>
-                            <td>{{ r.approved_by.username|default:"-" }}</td>
-                            <td>{{ r.rejected_by.username|default:"-" }}</td>
-                            <td class="text-muted small">{{ r.rejection_reason|default:"-" }}</td>
-                            <td>{{ r.issued_by.username|default:"-" }}</td>
+
+                            <td>{{ ir.requested_id|default:ir.request_id|default:ir.id }}</td>
+
+                            <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
+
+                            <td>{{ ir.product.asset_id }}</td>
+
+                            <td>{{ ir.product.item_name }}</td>
+
+                            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
+
+                            <td>
+
+                                {% if ir.requested_by_department %}
+
+                                    {{ ir.get_requested_by_department_display }}<br>
+
+                                    <span class="text-muted small">{{ ir.get_requested_by_section_display|default:"-" }}</span>
+
+                                {% else %}
+
+                                    -
+
+                                {% endif %}
+
+                            </td>
+
+                            <td>{{ ir.requested_by_mobile|default:"-" }}</td>
+
+                            <td><center>{{ ir.approved_quantity|default:ir.quantity }}</center></td>
+
+                            <td><span class="reason-scroll">{% if ir.request_reason %}{{ ir.request_reason }}{% else %}-{% endif %}</span></td>
+
+                            <td>
+
+                                {{ ir.approved_by.username|default:"-" }}
+
+                                {% if ir.approved_by_full_name %}<br><span class="text-muted small">{{ ir.approved_by_full_name }}</span>{% endif %}
+
+                            </td>
+
+                            <td>
+
+                                {{ ir.rejected_by.username|default:"-" }}
+
+                                {% if ir.rejected_by_full_name %}<br><span class="text-muted small">{{ ir.rejected_by_full_name }}</span>{% endif %}
+
+                            </td>
+
+                            <td><span class="reason-scroll">{{ ir.rejection_reason|default:"-" }}</span></td>
+
+                            <td>
+
+                                {{ ir.issued_by.username|default:"-" }}
+
+                                {% if ir.issued_by_full_name %}<br><span class="text-muted small">{{ ir.issued_by_full_name }}</span>{% endif %}
+
+                            </td>
+
+                            <td>
+
+                                {{ ir.confirmed_by.username|default:"-" }}
+
+                                {% if ir.confirmed_by_full_name %}<br><span class="text-muted small">{{ ir.confirmed_by_full_name }}</span>{% endif %}
+
+                            </td>
+
+                            <td class="text-muted small">{{ ir.confirmed_at|date:"Y-m-d H:i"|default:"-" }}</td>
+
+                            <td>
+
+                                {% if user.can_approve_issue_requests %}
+
+                                    {% if ir.status == 'pending' %}
+
+                                        <button class="btn btn-sm btn-warning">Pending</button>
+
+                                    {% elif ir.status == 'approved' %}
+
+                                        <button class="btn btn-sm btn-yellow">Approved</button>
+
+                                    {% elif ir.status == 'rejected' %}
+
+                                        <button class="btn btn-sm btn-danger">Rejected</button>
+
+                                    {% elif ir.status == 'issued' %}
+
+                                        <button class="btn btn-sm btn-success">Issued</button>
+
+                                    {% elif ir.status == 'confirmed' %}
+
+                                        <button class="btn btn-sm btn-info">Confirmed</button>
+
+                                    {% endif %}
+
+                                {% else %}
+
+                                    <span class="badge bg-{{
+
+                                        'warning' if ir.status == 'pending' else
+
+                                        'success' if ir.status == 'approved' else
+
+                                        'primary' if ir.status == 'issued' else
+
+                                        'info' if ir.status == 'confirmed' else
+
+                                        'danger'
+
+                                    }}">
+
+                                        {{ ir.get_status_display }}
+
+                                    </span>
+
+                                {% endif %}
+
+                                <!-- Print-only colored status label -->
+
+                                <span class="print-status print-status-{{ ir.status }}">{{ ir.get_status_display }}</span>
+
+                            </td>
+
+                            <td>
+
+                                {% if ir.attachment %}
+
+                                    <a class="text-decoration-none" target="_blank" href="{% url 'inventory:issue_request_attachment' pk=ir.pk %}">
+
+                                        <i class="bi bi-file-earmark-text"></i> View
+
+                                    </a>
+
+                                {% else %}
+
+                                    <span class="text-muted small">-</span>
+
+                                {% endif %}
+
+                            </td>
+
                         </tr>
+
                         {% empty %}
-                        <tr><td colspan="11" class="text-muted">No history.</td></tr>
+
+                        <tr><td colspan="17" class="text-muted">No completed requests yet.</td></tr>
+
                         {% endfor %}
+
                     </tbody>
+
                 </table>
+
             </div>
+
         </div>
+
     </div>
+
 </div>
+
 {% endblock %}

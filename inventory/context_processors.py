@@ -1,12 +1,10 @@
 """Template context: expose permissions and navbar data."""
-from .models import CATEGORY_CHOICES, Notification
+from .models import CATEGORY_CHOICES
 
 def stage_permissions(request):
     if request.user.is_authenticated:
         choices = dict(CATEGORY_CHOICES)
         allowed = request.user.allowed_categories()
-        unread = Notification.objects.filter(recipient=request.user, read=False)[:10]
-        unread_count = Notification.objects.filter(recipient=request.user, read=False).count()
         return {
             'user_can_edit': request.user.can_edit(),
             'user_can_request_issue': request.user.can_request_issue(),
@@ -17,8 +15,6 @@ def stage_permissions(request):
             'user_allowed_categories': allowed,
             'category_display': choices,
             'navbar_categories': [{'slug': c, 'name': choices.get(c, c)} for c in allowed],
-            'unread_notifications': unread,
-            'unread_notifications_count': unread_count,
         }
     return {
         'user_can_edit': False,
@@ -30,6 +26,4 @@ def stage_permissions(request):
         'user_allowed_categories': [],
         'category_display': dict(CATEGORY_CHOICES),
         'navbar_categories': [{'slug': c[0], 'name': c[1]} for c in CATEGORY_CHOICES],
-        'unread_notifications': [],
-        'unread_notifications_count': 0,
     }
