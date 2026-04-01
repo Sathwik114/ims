@@ -7,6 +7,7 @@
         <div class="d-flex gap-2">
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
             <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:reports_logins_pdf' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">Download PDF</a>
+            <a class="btn btn-outline-success btn-sm" href="{% url 'inventory:reports_logins_excel' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}">Download Excel</a>
         </div>
     </div>
     <form method="get" class="row g-2 mb-3">

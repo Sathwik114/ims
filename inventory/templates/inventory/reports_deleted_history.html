@@ -7,6 +7,7 @@
         <div class="d-flex gap-2">
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print</button>
             <a class="btn btn-outline-primary btn-sm" href="{% url 'inventory:reports_deleted_history_pdf' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}&category={{ selected_category }}&asset_id={{ search_asset }}">Download PDF</a>
+            <a class="btn btn-outline-success btn-sm" href="{% url 'inventory:reports_deleted_history_excel' %}?from={{ from_date }}&to={{ to_date }}&month={{ search_month }}&category={{ selected_category }}&asset_id={{ search_asset }}">Download Excel</a>
         </div>
     </div>
     

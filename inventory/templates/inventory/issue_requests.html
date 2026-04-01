@@ -703,6 +703,7 @@
             <th>Approved by</th>
             <th>Issued by</th>
             <th>Confirmed by</th>
+            <th>File</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -747,6 +748,11 @@
               {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
             </td>
             <td>
+              {% if ir.attachment %}
+                <a class="file-link" href="{% url 'inventory:issue_request_attachment' pk=ir.pk %}" target="_blank">📎 View</a>
+              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+            </td>
+            <td>
               {% if ir.status == 'issued' %}
               <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}">{% csrf_token %}
                 <button class="btn-ir btn-success btn-sm" type="submit" onclick="return confirm('Confirm receipt of this item?')">Confirm receipt</button>
@@ -757,7 +763,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr class="empty-row"><td colspan="9">You haven't made any requests yet.</td></tr>
+          <tr class="empty-row"><td colspan="10">You haven't made any requests yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

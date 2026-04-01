@@ -1038,6 +1038,12 @@ def issue_requests_new(request):
             'issue_request_files'
         )
         
+        # Ensure proper path for Django FileField (upload_to='issue_request_files/')
+        if attachment_filename and not attachment_filename.startswith('issue_request_files/'):
+            attachment_path = f'issue_request_files/{attachment_filename}'
+        else:
+            attachment_path = attachment_filename
+        
         ir = IssueRequest.objects.create(
             product=product,
             requested_by=request.user,
@@ -1045,7 +1051,7 @@ def issue_requests_new(request):
             requested_by_mobile=request.user.mobile_number or '',
             quantity=qty,
             request_reason=form.cleaned_data['reason'],
-            attachment=attachment_filename,
+            attachment=attachment_path,
             status=IssueRequest.STATUS_PENDING,
         )
         
@@ -1149,6 +1155,12 @@ def issue_requests(request):
             'issue_request_files'
         )
         
+        # Ensure proper path for Django FileField (upload_to='issue_request_files/')
+        if attachment_filename and not attachment_filename.startswith('issue_request_files/'):
+            attachment_path = f'issue_request_files/{attachment_filename}'
+        else:
+            attachment_path = attachment_filename
+        
         ir = IssueRequest.objects.create(
             product=product,
             requested_by=request.user,
@@ -1156,7 +1168,7 @@ def issue_requests(request):
             requested_by_mobile=request.user.mobile_number or '',
             quantity=qty,
             request_reason=form.cleaned_data['reason'],
-            attachment=attachment_filename,
+            attachment=attachment_path,
             status=IssueRequest.STATUS_PENDING,
         )
         
@@ -1270,18 +1282,89 @@ def issue_request_attachment(request, pk):
     as_attachment = request.GET.get('download') == '1'
     filename = ir.attachment.name.split('/')[-1]
     
-    # Get decompressed content if file is compressed
-    file_path = ir.attachment.path
-    if filename.endswith('.gz'):
-        # Remove .gz extension for original filename
-        original_filename = filename[:-3]
-        content = get_compressed_file_content(file_path)
-        response = HttpResponse(content, content_type='application/octet-stream')
-        if as_attachment:
-            response['Content-Disposition'] = f'attachment; filename="{original_filename}"'
-        return response
-    else:
-        return FileResponse(ir.attachment.open('rb'), as_attachment=as_attachment, filename=filename)
+    try:
+        # Debug info
+        print(f"DEBUG: Attachment name in DB: {ir.attachment.name}")
+        print(f"DEBUG: Attachment path: {ir.attachment.path}")
+        print(f"DEBUG: File exists check: {ir.attachment.storage.exists(ir.attachment.name)}")
+        
+        # Check if file exists
+        if not ir.attachment.storage.exists(ir.attachment.name):
+            messages.error(request, f'File not found on server. Path: {ir.attachment.name}')
+            return redirect('inventory:issue_requests')
+        
+        # Get decompressed content if file is compressed
+        file_path = ir.attachment.path
+        if filename.endswith('.gz'):
+            # Remove .gz extension for original filename
+            original_filename = filename[:-3]
+            content = get_compressed_file_content(file_path)
+            
+            # Detect content type from original filename
+            content_type = 'application/octet-stream'
+            if original_filename.lower().endswith('.pdf'):
+                content_type = 'application/pdf'
+            elif original_filename.lower().endswith(('.jpg', '.jpeg')):
+                content_type = 'image/jpeg'
+            elif original_filename.lower().endswith('.png'):
+                content_type = 'image/png'
+            elif original_filename.lower().endswith('.gif'):
+                content_type = 'image/gif'
+            elif original_filename.lower().endswith('.txt'):
+                content_type = 'text/plain'
+            
+            response = HttpResponse(content, content_type=content_type)
+            if as_attachment:
+                response['Content-Disposition'] = f'attachment; filename="{original_filename}"'
+            else:
+                response['Content-Disposition'] = f'inline; filename="{original_filename}"'
+                response['Cache-Control'] = 'public, max-age=0'
+                if original_filename.lower().endswith('.pdf'):
+                    response['X-Content-Type-Options'] = 'nosniff'
+            return response
+        else:
+            # Serve file directly using HttpResponse for better compatibility
+            file_obj = ir.attachment.open('rb')
+            content = file_obj.read()
+            file_obj.close()
+            
+            content_type = 'application/octet-stream'
+            
+            # Set proper content type based on extension
+            if filename.lower().endswith('.pdf'):
+                content_type = 'application/pdf'
+            elif filename.lower().endswith(('.jpg', '.jpeg')):
+                content_type = 'image/jpeg'
+            elif filename.lower().endswith('.png'):
+                content_type = 'image/png'
+            elif filename.lower().endswith('.gif'):
+                content_type = 'image/gif'
+            elif filename.lower().endswith('.txt'):
+                content_type = 'text/plain'
+            elif filename.lower().endswith('.doc'):
+                content_type = 'application/msword'
+            elif filename.lower().endswith('.docx'):
+                content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            elif filename.lower().endswith('.xls'):
+                content_type = 'application/vnd.ms-excel'
+            elif filename.lower().endswith('.xlsx'):
+                content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            
+            response = HttpResponse(content, content_type=content_type)
+            if as_attachment:
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            else:
+                # For inline viewing - ensure browser displays the file
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+                # Prevent caching issues
+                response['Cache-Control'] = 'public, max-age=0'
+                # Ensure proper handling for PDFs
+                if filename.lower().endswith('.pdf'):
+                    response['X-Content-Type-Options'] = 'nosniff'
+            return response
+    except Exception as e:
+        messages.error(request, f'Error accessing file: {str(e)}')
+        return redirect('inventory:issue_requests')
 
 
 @login_required
@@ -2650,6 +2733,79 @@ def reports_logins_pdf(request):
 
 
 @login_required
+def reports_logins_excel(request):
+    if not _reports_allowed(request):
+        return HttpResponse('Forbidden', status=403)
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+    except ImportError:
+        return HttpResponse('Excel export requires openpyxl. Install with: pip install openpyxl', status=501)
+    
+    from_date = request.GET.get('from', '')
+    to_date = request.GET.get('to', '')
+    month = request.GET.get('month', '')
+    qs = LoginHistory.objects.select_related('user').all().order_by('-logged_in_at')
+    if from_date:
+        qs = qs.filter(logged_in_at__date__gte=from_date)
+    if to_date:
+        qs = qs.filter(logged_in_at__date__lte=to_date)
+    if month:
+        try:
+            qs = qs.filter(logged_in_at__month=int(month))
+        except ValueError:
+            pass
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "All Logins"
+    
+    headers = ['When', 'Username', 'Full Name', 'Stage', 'System IP', 'Hostname', 'Type']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    for row, r in enumerate(qs[:1000], 2):
+        u = r.user
+        connection_type = 'LAN' if r.is_lan else 'External'
+        data = [
+            r.logged_in_at.strftime('%Y-%m-%d %H:%M'),
+            u.username,
+            u.full_name or '-',
+            u.stage,
+            r.ip_address or '-',
+            r.hostname or 'Unknown',
+            connection_type,
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.alignment = Alignment(horizontal="left", vertical="top")
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    column_widths = [18, 15, 20, 8, 15, 20, 10]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="all_logins.xlsx"'
+    return response
+
+
+@login_required
 def reports_transactions(request):
     if not _reports_allowed(request):
         return redirect('inventory:dashboard')
@@ -2736,24 +2892,104 @@ def reports_transactions_pdf(request):
 
 
 @login_required
+def reports_transactions_excel(request):
+    if not _reports_allowed(request):
+        return HttpResponse('Forbidden', status=403)
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+    except ImportError:
+        return HttpResponse('Excel export requires openpyxl. Install with: pip install openpyxl', status=501)
+    
+    from_date = request.GET.get('from', '')
+    to_date = request.GET.get('to', '')
+    month = request.GET.get('month', '')
+    
+    qs = IssueRequest.objects.select_related('product', 'requested_by', 'approved_by', 'rejected_by', 'issued_by', 'confirmed_by').order_by('-created_at')
+    
+    if from_date:
+        qs = qs.filter(created_at__date__gte=from_date)
+    if to_date:
+        qs = qs.filter(created_at__date__lte=to_date)
+    if month:
+        try:
+            qs = qs.filter(created_at__month=int(month))
+        except ValueError:
+            pass
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "All Transactions"
+    
+    headers = ['Requested Date', 'Asset ID', 'Item', 'Requested By', 'Dept|Section', 'Mobile', 'Quantity', 'Status', 'Approved By', 'Issued By', 'Confirmed By']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    for row, r in enumerate(qs[:500], 2):
+        data = [
+            r.created_at.strftime('%Y-%m-%d %H:%M'),
+            r.product.asset_id,
+            r.product.item_name,
+            r.requested_by.username if r.requested_by else '-',
+            f"{r.get_requested_by_department_display() or '-'}|{r.get_requested_by_section_display() or '-'}",
+            r.requested_by_mobile or '-',
+            r.approved_quantity or r.quantity,
+            r.get_status_display(),
+            r.approved_by.username if r.approved_by else '-',
+            r.issued_by.username if r.issued_by else '-',
+            r.confirmed_by.username if r.confirmed_by else '-',
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    column_widths = [18, 12, 25, 15, 15, 12, 10, 12, 15, 15, 15]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="all_transactions.xlsx"'
+    return response
+
+
+@login_required
 def reports_updates(request):
     if not _reports_allowed(request):
         return redirect('inventory:dashboard')
     from_date = request.GET.get('from', '')
     to_date = request.GET.get('to', '')
     month = request.GET.get('month', '')
-    qs = Product.objects.all().order_by('-updated_at')
+    
+    # Use UploadHistory to show each upload as a separate row
+    qs = UploadHistory.objects.select_related('product', 'uploaded_by').order_by('-uploaded_at')
+    
     if from_date:
-        qs = qs.filter(updated_at__date__gte=from_date)
+        qs = qs.filter(uploaded_at__date__gte=from_date)
     if to_date:
-        qs = qs.filter(updated_at__date__lte=to_date)
+        qs = qs.filter(uploaded_at__date__lte=to_date)
     if month:
         try:
-            qs = qs.filter(updated_at__month=int(month))
+            qs = qs.filter(uploaded_at__month=int(month))
         except ValueError:
             pass
     return render(request, 'inventory/reports_updates.html', {
-        'products': qs[:500],
+        'upload_history': qs[:500],
         'from_date': from_date,
         'to_date': to_date,
         'search_month': month,
@@ -2775,29 +3011,112 @@ def reports_updates_pdf(request):
     from_date = request.GET.get('from', '')
     to_date = request.GET.get('to', '')
     month = request.GET.get('month', '')
-    qs = Product.objects.all().order_by('-updated_at')
+    
+    # Use UploadHistory to show each upload as a separate row
+    qs = UploadHistory.objects.select_related('product', 'uploaded_by').order_by('-uploaded_at')
+    
     if from_date:
-        qs = qs.filter(updated_at__date__gte=from_date)
+        qs = qs.filter(uploaded_at__date__gte=from_date)
     if to_date:
-        qs = qs.filter(updated_at__date__lte=to_date)
+        qs = qs.filter(uploaded_at__date__lte=to_date)
     if month:
         try:
-            qs = qs.filter(updated_at__month=int(month))
+            qs = qs.filter(uploaded_at__month=int(month))
         except ValueError:
             pass
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=letter)
     styles = getSampleStyleSheet()
     elements = [Paragraph('All Updates (Items added/updated)', styles['Title']), Spacer(1, 12)]
-    data = [['Asset ID', 'Item', 'Category', 'Qty', 'Created', 'Updated']]
-    for p in qs[:500]:
-        data.append([p.asset_id, p.item_name, p.get_category_display(), str(p.quantity_available), p.created_at.strftime('%Y-%m-%d'), p.updated_at.strftime('%Y-%m-%d %H:%M')])
+    data = [['Uploaded At', 'Asset ID', 'Item', 'Category', 'Qty Added', 'Uploaded By']]
+    for h in qs[:500]:
+        data.append([
+            h.uploaded_at.strftime('%Y-%m-%d %H:%M'),
+            h.product.asset_id,
+            h.product.item_name,
+            h.product.get_category_display(),
+            str(h.quantity_added),
+            h.uploaded_by.username if h.uploaded_by else '-'
+        ])
     t = Table(data, repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey), ('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
     elements.append(t)
     doc.build(elements)
     buf.seek(0)
     return HttpResponse(buf.read(), content_type='application/pdf', headers={'Content-Disposition': 'attachment; filename="all_updates.pdf"'})
+
+
+@login_required
+def reports_updates_excel(request):
+    if not _reports_allowed(request):
+        return HttpResponse('Forbidden', status=403)
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+    except ImportError:
+        return HttpResponse('Excel export requires openpyxl. Install with: pip install openpyxl', status=501)
+    
+    from_date = request.GET.get('from', '')
+    to_date = request.GET.get('to', '')
+    month = request.GET.get('month', '')
+    
+    # Use UploadHistory to show each upload as a separate row
+    qs = UploadHistory.objects.select_related('product', 'uploaded_by').order_by('-uploaded_at')
+    
+    if from_date:
+        qs = qs.filter(uploaded_at__date__gte=from_date)
+    if to_date:
+        qs = qs.filter(uploaded_at__date__lte=to_date)
+    if month:
+        try:
+            qs = qs.filter(uploaded_at__month=int(month))
+        except ValueError:
+            pass
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "All Updates"
+    
+    headers = ['Uploaded At', 'Asset ID', 'Item', 'Category', 'Qty Added', 'Uploaded By']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    for row, h in enumerate(qs[:500], 2):
+        data = [
+            h.uploaded_at.strftime('%Y-%m-%d %H:%M'),
+            h.product.asset_id,
+            h.product.item_name,
+            h.product.get_category_display(),
+            h.quantity_added,
+            h.uploaded_by.username if h.uploaded_by else '-',
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.alignment = Alignment(horizontal="left", vertical="top")
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    column_widths = [18, 15, 30, 15, 12, 15]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="all_updates.xlsx"'
+    return response
 
 
 @login_required
@@ -2902,6 +3221,84 @@ def reports_deleted_history_pdf(request):
     buf.seek(0)
     response = HttpResponse(buf.read(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="deleted_history.pdf"'
+    return response
+
+
+@login_required
+def reports_deleted_history_excel(request):
+    if not request.user.is_stage1():
+        return HttpResponse('Forbidden', status=403)
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+    except ImportError:
+        return HttpResponse('Excel export requires openpyxl. Install with: pip install openpyxl', status=501)
+
+    qs = DeletedHistory.objects.all().select_related('deleted_by').order_by('-deleted_at')
+    from_date = request.GET.get('from', '')
+    to_date = request.GET.get('to', '')
+    search_month = request.GET.get('month', '')
+    category = request.GET.get('category', '')
+    search_asset = request.GET.get('asset_id', '').strip()
+    
+    if from_date:
+        qs = qs.filter(deleted_at__date__gte=from_date)
+    if to_date:
+        qs = qs.filter(deleted_at__date__lte=to_date)
+    if search_month:
+        try:
+            qs = qs.filter(deleted_at__month=int(search_month))
+        except ValueError:
+            pass
+    if category:
+        qs = qs.filter(category=category)
+    if search_asset:
+        qs = qs.filter(asset_id__icontains=search_asset)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Deleted History"
+    
+    headers = ['Asset ID', 'Item Name', 'Category', 'Qty', 'Deleted By', 'Deleted At', 'Reason']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    for row, record in enumerate(qs[:500], 2):
+        data = [
+            record.asset_id,
+            record.item_name,
+            record.get_category_display(),
+            record.quantity_available,
+            record.deleted_by.username if record.deleted_by else 'Unknown',
+            record.deleted_at.strftime('%Y-%m-%d %H:%M'),
+            record.deletion_reason or '-',
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    column_widths = [15, 30, 15, 10, 15, 18, 40]
+    for col, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="deleted_history.xlsx"'
     return response
 
 
@@ -3217,6 +3614,79 @@ def manage_users(request):
         if target.is_superuser or target.can_manage_users():
             messages.error(request, 'You cannot delete this user.')
             return redirect('inventory:manage_users')
+        
+        # Check for database relationships
+        has_relations = False
+        relation_details = []
+        
+        # Check issue requests made by user
+        if target.issue_requests_made.exists():
+            has_relations = True
+            relation_details.append(f"Issue Requests ({target.issue_requests_made.count()})")
+        
+        # Check issue requests approved/rejected/issued/confirmed by user
+        if target.issue_requests_approved.exists():
+            has_relations = True
+            relation_details.append(f"Approved Requests ({target.issue_requests_approved.count()})")
+        if target.issue_requests_rejected.exists():
+            has_relations = True
+            relation_details.append(f"Rejected Requests ({target.issue_requests_rejected.count()})")
+        if target.issue_requests_issued.exists():
+            has_relations = True
+            relation_details.append(f"Issued Requests ({target.issue_requests_issued.count()})")
+        if target.issue_requests_confirmed.exists():
+            has_relations = True
+            relation_details.append(f"Confirmed Requests ({target.issue_requests_confirmed.count()})")
+        
+        # Check issue history
+        if target.issues_made.exists():
+            has_relations = True
+            relation_details.append(f"Issues Made ({target.issues_made.count()})")
+        if target.issues_approved.exists():
+            has_relations = True
+            relation_details.append(f"Issues Approved ({target.issues_approved.count()})")
+        if target.issues_confirmed.exists():
+            has_relations = True
+            relation_details.append(f"Issues Confirmed ({target.issues_confirmed.count()})")
+        if target.issues_received.exists():
+            has_relations = True
+            relation_details.append(f"Issues Received ({target.issues_received.count()})")
+        
+        # Check upload history
+        if target.uploads_made.exists():
+            has_relations = True
+            relation_details.append(f"Uploads Made ({target.uploads_made.count()})")
+        
+        # Check orders
+        if target.orders_made.exists():
+            has_relations = True
+            relation_details.append(f"Orders Made ({target.orders_made.count()})")
+        
+        # Check management upload requests
+        if target.management_upload_requests_made.exists():
+            has_relations = True
+            relation_details.append(f"Management Upload Requests ({target.management_upload_requests_made.count()})")
+        
+        # Check peripheral applications
+        if target.peripheral_applications.exists():
+            has_relations = True
+            relation_details.append(f"Peripheral Applications ({target.peripheral_applications.count()})")
+        
+        # Check login history
+        if target.login_history.exists():
+            has_relations = True
+            relation_details.append(f"Login History ({target.login_history.count()})")
+        
+        # Check deleted items
+        if target.items_deleted.exists():
+            has_relations = True
+            relation_details.append(f"Deleted Items ({target.items_deleted.count()})")
+        
+        if has_relations:
+            details_str = ", ".join(relation_details)
+            messages.error(request, f'Cannot delete user "{target.username}". User has existing database records: {details_str}')
+            return redirect('inventory:manage_users')
+        
         username = target.username
         target.delete()
         messages.success(request, f'User "{username}" deleted.')

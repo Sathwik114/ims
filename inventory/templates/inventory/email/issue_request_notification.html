@@ -137,7 +137,7 @@
             </tr>
             <tr>
                 <td>Requested By:</td>
-                <td>{{ issue_request.requested_by.username }} | {{ issue_request.requested_by.get_full_name }}</td>
+                <td>{{ issue_request.requested_by.get_full_name|default:issue_request.requested_by.username }} ({{ issue_request.requested_by.username }})</td>
             </tr>
             <tr>
                 <td>Email:</td>
