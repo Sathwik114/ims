@@ -58,16 +58,8 @@ class AddProductForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filter rack choices by selected category when possible
-        category = None
-        if self.data.get('category'):
-            category = self.data.get('category')
-        elif self.initial.get('category'):
-            category = self.initial.get('category')
-        if category:
-            self.fields['rack'].queryset = Rack.objects.filter(category=category).order_by('rack_number')
-        else:
-            self.fields['rack'].queryset = Rack.objects.all().order_by('category', 'rack_number')
+        # Show all racks (category removed from Rack model)
+        self.fields['rack'].queryset = Rack.objects.all().order_by('rack_number')
 
     def save(self, commit=True):
         obj = super().save(commit=False)
@@ -90,9 +82,8 @@ class AddProductForm(forms.ModelForm):
 class AddRackForm(forms.ModelForm):
     class Meta:
         model = Rack
-        fields = ['category', 'cabin_name', 'rack_number', 'rows', 'columns', 'number_of_racks']
+        fields = ['cabin_name', 'rack_number', 'rows', 'columns', 'number_of_racks']
         widgets = {
-            'category': forms.Select(attrs={'class': 'form-control'}),
             'cabin_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Cabin name'}),
             'rack_number': forms.TextInput(attrs={'class': 'form-control'}),
             'rows': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),

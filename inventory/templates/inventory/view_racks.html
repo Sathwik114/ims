@@ -359,8 +359,7 @@
             <table class="vr-tbl" id="vr-tbl">
                 <thead>
                     <tr>
-                        <th>Rack No.</th>
-                        <th>Category</th>
+                        <th>Rack</th>
                         <th>Cabin</th>
                         <th>Items</th>
                         <th>Qty</th>
@@ -372,16 +371,8 @@
                     {% for ri in rack_summary %}
                     <tr class="vr-row"
                         data-url="{% url 'inventory:rack_detail' ri.rack.pk %}"
-                        data-cat="{{ ri.rack.get_category_display|lower }}"
                         data-q="{{ ri.rack.rack_number|lower }} {{ ri.rack.cabin_name|lower }}">
                         <td><span class="rack-chip">{{ ri.rack.rack_number }}</span></td>
-                        <td>
-                            {% with c=ri.rack.get_category_display|lower %}
-                            <span class="cat-pill {% if 'network' in c %}networking{% elif 'hardware' in c %}hardware{% elif 'security' in c %}security{% elif 'server' in c %}server-parts{% else %}default{% endif %}">
-                                {{ ri.rack.get_category_display }}
-                            </span>
-                            {% endwith %}
-                        </td>
                         <td><span class="cabin-txt">{{ ri.rack.cabin_name|default:"—" }}</span></td>
                         <td><span class="n-chip it">{{ ri.total_items }}</span></td>
                         <td><span class="n-chip qty">{{ ri.total_quantity }}</span></td>

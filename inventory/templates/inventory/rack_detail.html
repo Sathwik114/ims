@@ -323,7 +323,7 @@
             <div class="rd-icon"><i class="bi bi-layout-three-columns"></i></div>
             <div>
                 <h5>{{ rack.rack_number }}</h5>
-                <p>{{ rack.get_category_display }}{% if rack.cabin_name %} · {{ rack.cabin_name }}{% endif %}</p>
+                <p>{% if rack.cabin_name %}{{ rack.cabin_name }}{% else %}No Cabin{% endif %}</p>
             </div>
         </div>
         <div class="rd-breadcrumb">
@@ -338,16 +338,6 @@
         <div class="rd-info-pill">
             <span class="rd-info-lbl">Rack Number</span>
             <span class="rd-info-val mono">{{ rack.rack_number }}</span>
-        </div>
-        <div class="rd-info-pill">
-            <span class="rd-info-lbl">Category</span>
-            <span class="rd-info-val">
-                {% with c=rack.get_category_display|lower %}
-                <span class="cat-pill {% if 'network' in c %}networking{% elif 'hardware' in c %}hardware{% elif 'security' in c %}security{% elif 'server' in c %}server-parts{% else %}default{% endif %}">
-                    {{ rack.get_category_display }}
-                </span>
-                {% endwith %}
-            </span>
         </div>
         {% if rack.cabin_name %}
         <div class="rd-info-pill">
@@ -407,6 +397,7 @@
                     <tr>
                         <th>Asset ID</th>
                         <th>Item Name</th>
+                        <th>Category</th>
                         <th>On Hand</th>
                         <th>On Order</th>
                         <th>Total</th>
@@ -419,6 +410,13 @@
                     <tr>
                         <td><span class="asset-chip">{{ item.product.asset_id }}</span></td>
                         <td><span class="item-name">{{ item.product.item_name }}</span></td>
+                        <td>
+                            {% with c=item.product.get_category_display|lower %}
+                            <span class="cat-pill {% if 'network' in c %}networking{% elif 'hardware' in c %}hardware{% elif 'security' in c %}security{% elif 'server' in c %}server-parts{% else %}default{% endif %}">
+                                {{ item.product.get_category_display }}
+                            </span>
+                            {% endwith %}
+                        </td>
                         <td><span class="n-chip">{{ item.product.quantity_available }}</span></td>
                         <td>
                             <span class="n-chip {% if item.product.on_order == 0 %}zero{% endif %}">

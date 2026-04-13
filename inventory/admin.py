@@ -25,8 +25,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Rack)
 class RackAdmin(admin.ModelAdmin):
-    list_display = ['rack_number', 'category', 'cabin_name', 'rows', 'columns', 'number_of_racks', 'created_at']
-    list_filter = ['category']
+    list_display = ['rack_number', 'cabin_name', 'rows', 'columns', 'number_of_racks', 'created_at']
+    list_filter = ['created_at']
 
 
 @admin.register(Product)

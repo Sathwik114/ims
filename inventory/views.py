@@ -810,17 +810,18 @@ def add_product(request, category):
 
 @login_required
 def add_rack(request, category):
-    if category not in request.user.allowed_categories() or not request.user.can_edit():
+    """Add rack - category parameter kept for URL compatibility but not used."""
+    if not request.user.can_edit():
         messages.error(request, 'Permission denied.')
         return redirect('inventory:dashboard')
     if request.method == 'POST':
-        form = AddRackForm(category, request.POST)
+        form = AddRackForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, 'Rack added successfully.')
             return redirect('inventory:category_detail', category=category)
     else:
-        form = AddRackForm(category)
+        form = AddRackForm()
     return render(request, 'inventory/add_rack.html', {
         'form': form, 'category': category,
         'category_name': dict(CATEGORY_CHOICES).get(category, category),
@@ -3335,15 +3336,12 @@ def available_racks(request):
         return redirect('inventory:dashboard')
     
     # Get search and filter parameters
-    category = request.GET.get('category', '').strip()
     search = request.GET.get('search', '').strip()
     
     # Get all racks with filtering
     racks_query = Rack.objects.all()
-    if category:
-        racks_query = racks_query.filter(category=category)
 
-    racks = racks_query.order_by('category', 'rack_number')
+    racks = racks_query.order_by('rack_number')
     rack_data = []
     
     for rack in racks:
@@ -3416,9 +3414,7 @@ def available_racks(request):
     return render(request, 'inventory/available_racks.html', {
         'rack_data': rack_data,
         'total_racks': len(rack_data),
-        'selected_category': category,
         'search': search,
-        'categories': [{'slug': c[0], 'name': c[1]} for c in CATEGORY_CHOICES],
     })
 
 
@@ -3430,15 +3426,12 @@ def view_racks(request):
         return redirect('inventory:dashboard')
     
     # Get search and filter parameters
-    category = request.GET.get('category', '').strip()
     search = request.GET.get('search', '').strip()
     
     # Get all racks with filtering
     racks_query = Rack.objects.all()
-    if category:
-        racks_query = racks_query.filter(category=category)
 
-    racks = racks_query.order_by('category', 'rack_number')
+    racks = racks_query.order_by('rack_number')
     rack_summary = []
     
     for rack in racks:
@@ -3505,9 +3498,7 @@ def view_racks(request):
     return render(request, 'inventory/view_racks.html', {
         'rack_summary': rack_summary,
         'total_racks': len(rack_summary),
-        'selected_category': category,
         'search': search,
-        'categories': [{'slug': c[0], 'name': c[1]} for c in CATEGORY_CHOICES],
         'total_items_count': total_items_count,
         'total_quantity_sum': total_quantity_sum,
         'total_value_sum': total_value_sum,

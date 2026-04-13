@@ -279,14 +279,13 @@
     {% if rack_data %}
         {% for rack_info in rack_data %}
         <div class="ar-rack-block"
-             data-cat="{{ rack_info.rack.get_category_display|lower }}"
              data-q="{{ rack_info.rack.rack_number|lower }} {{ rack_info.rack.cabin_name|lower }} {% for item in rack_info.items %}{{ item.item_name|lower }} {{ item.asset_id|lower }} {% endfor %}">
 
             <!-- Rack header -->
             <div class="ar-rack-head">
                 <div class="ar-rack-title">
                     <i class="bi bi-layout-three-columns"></i>
-                    {{ rack_info.rack.get_category_display }} — {{ rack_info.rack.rack_number }}
+                    {{ rack_info.rack.rack_number }}
                     {% if rack_info.rack.cabin_name %}
                     <span style="font-weight:400;color:#6b7490;font-size:0.74rem;">({{ rack_info.rack.cabin_name }})</span>
                     {% endif %}

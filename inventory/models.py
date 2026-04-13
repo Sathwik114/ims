@@ -370,8 +370,7 @@ class Category(models.Model):
 
 
 class Rack(models.Model):
-    """Rack with cabin, rows and columns. Belongs to a category."""
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+    """Rack with cabin, rows and columns."""
     cabin_name = models.CharField(max_length=100, blank=True, default='')
     rack_number = models.CharField(max_length=50)
     rows = models.PositiveIntegerField(default=1)
@@ -380,11 +379,11 @@ class Rack(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [('category', 'rack_number')]
-        ordering = ['category', 'rack_number']
+        unique_together = [('rack_number', 'cabin_name')]
+        ordering = ['rack_number']
 
     def __str__(self):
-        return f"{self.get_category_display()} - Rack {self.rack_number}"
+        return f"Rack {self.rack_number} - {self.cabin_name or 'No Cabin'}"
 
 
 class Product(models.Model):
