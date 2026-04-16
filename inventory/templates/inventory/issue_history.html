@@ -453,7 +453,7 @@
                 -
               {% endif %}
             </td>
-            <td>{{ ir.requested_by.username }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
+            <td>{{ ir.requester_username_display }}{% if ir.requested_by_full_name %}<br><span class="text-muted small">{{ ir.requested_by_full_name }}</span>{% endif %}</td>
             <td>{{ ir.requested_by_mobile|default:"-" }}</td>
             <td>{{ ir.approved_quantity|default:ir.quantity }}</td>
             <td>{{ ir.request_reason|default:"-" }}</td>
@@ -469,20 +469,20 @@
               </span>
             </td>
             <td>
-              {{ ir.approved_by.username|default:"-" }}
+              {% if ir.approved_by %}{{ ir.approved_by.username }}{% else %}-{% endif %}
               {% if ir.approved_by_full_name %}<br><span class="text-muted small">{{ ir.approved_by_full_name }}</span>{% endif %}
             </td>
             <td>
-              {{ ir.rejected_by.username|default:"-" }}
+              {% if ir.rejected_by %}{{ ir.rejected_by.username }}{% else %}-{% endif %}
               {% if ir.rejected_by_full_name %}<br><span class="text-muted small">{{ ir.rejected_by_full_name }}</span>{% endif %}
             </td>
             <td>{{ ir.rejection_reason|default:"-" }}</td>
             <td>
-              {{ ir.issued_by.username|default:"-" }}
+              {% if ir.issued_by %}{{ ir.issued_by.username }}{% else %}-{% endif %}
               {% if ir.issued_by_full_name %}<br><span class="text-muted small">{{ ir.issued_by_full_name }}</span>{% endif %}
             </td>
             <td>
-              {{ ir.confirmed_by.username|default:"-" }}
+              {% if ir.confirmed_by %}{{ ir.confirmed_by.username }}{% else %}-{% endif %}
               {% if ir.confirmed_by_full_name %}<br><span class="text-muted small">{{ ir.confirmed_by_full_name }}</span>{% endif %}
             </td>
             <td class="text-muted small">{{ ir.confirmed_at|date:"Y-m-d H:i"|default:"-" }}</td>

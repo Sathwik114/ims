@@ -1000,29 +1000,38 @@
             <i class="bi bi-grid-1x2"></i> Dashboard
         </a>
 
-        <!-- View Items -->
-        <a class="nb-link" href="{% url 'inventory:view_items' %}">
-            <i class="bi bi-archive"></i> View Items
-        </a>
-        
-       <!-- View Racks (Stage 1 & 2 only) -->
-        {% if user.stage == 1 or user.stage == 2 %}
-        <a class="nb-link" href="{% url 'inventory:view_racks' %}">
-            <i class="bi bi-grid-3x3-gap"></i> View Racks
-        </a>
-        {% endif %}
-
-        <!-- Add -->
+        <!-- Insert -->
         {% if user_can_edit %}
         <div class="dropdown">
             <a class="nb-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                <i class="bi bi-plus-circle"></i> Add <i class="bi bi-chevron-down"></i>
+                <i class="bi bi-plus-circle"></i> Insert <i class="bi bi-chevron-down"></i>
             </a>
             <ul class="dropdown-menu nb-dropdown">
                 <li><a class="dropdown-item" href="{% url 'inventory:add_product_global' %}"><i
-                            class="bi bi-box-seam"></i> Add Item</a></li>
+                            class="bi bi-box-seam"></i> Insert Item</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:add_rack_global' %}"><i
-                            class="bi bi-layout-three-columns"></i> Add Rack</a></li>
+                            class="bi bi-layout-three-columns"></i> Insert Rack</a></li>
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- View -->
+        {% if user.stage == 3 %}
+        <a class="nb-link" href="{% url 'inventory:view_items' %}">
+            <i class="bi bi-archive"></i> View Items
+        </a>
+        {% else %}
+        <div class="dropdown">
+            <a class="nb-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                <i class="bi bi-eye"></i> View <i class="bi bi-chevron-down"></i>
+            </a>
+            <ul class="dropdown-menu nb-dropdown">
+                <li><a class="dropdown-item" href="{% url 'inventory:view_items' %}"><i
+                            class="bi bi-archive"></i> View Items</a></li>
+                {% if user.stage == 1 or user.stage == 2 %}
+                <li><a class="dropdown-item" href="{% url 'inventory:view_racks' %}"><i
+                            class="bi bi-grid-3x3-gap"></i> View Racks</a></li>
+                {% endif %}
             </ul>
         </div>
         {% endif %}
@@ -1031,7 +1040,7 @@
         {% if user_can_request_issue or user_can_approve_issue_requests or user_can_issue_items %}
         {% if user.stage == 3 %}
         <a class="nb-link" href="{% url 'inventory:issue_requests' %}">
-            <i class="bi bi-arrow-left-right"></i> Item Requests
+            <i class="bi bi-list-check"></i> Request an Item
         </a>
         {% else %}
         <div class="dropdown">
@@ -1041,38 +1050,45 @@
             <ul class="dropdown-menu nb-dropdown">
                 <li><a class="dropdown-item" href="{% url 'inventory:issue_requests' %}"><i
                             class="bi bi-list-check"></i> Requests</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:management_upload_requests' %}"><i
+                            class="bi bi-cloud-upload"></i> Purchase Requests</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:item_requests_history' %}"><i
                             class="bi bi-clock-history"></i> Issued History</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:issued_overview' %}"><i
                             class="bi bi-bar-chart"></i> Issued Overview</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:temporary_item_history' %}"><i
+                            class="bi bi-clock"></i> Temp Item History</a></li>
                 <li>
                     <hr class="dropdown-divider">
                 </li>
-                {% if user.stage != 3 %}
+                <li><a class="dropdown-item" href="{% url 'inventory:return_item' %}"><i
+                            class="bi bi-arrow-return-left"></i> Return an Item</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:returned_history' %}"><i
+                            class="bi bi-clock-history"></i> Returned History</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
                 <li><a class="dropdown-item" href="{% url 'inventory:issue_requests_new' %}"><i
-                            class="bi bi-plus-circle"></i> Request Item</a></li>
+                            class="bi bi-plus-circle"></i> Request an Item</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:my_history' %}"><i
                             class="bi bi-person-lines-fill"></i> My History</a></li>
-                {% endif %}
             </ul>
         </div>
         {% endif %}
         {% endif %}
 
-        
-
-        <!-- Upload Requests -->
-        {% if user.stage != 3 %}
-        <a class="nb-link" href="{% url 'inventory:management_upload_requests' %}">
-            <i class="bi bi-cloud-upload"></i> Purchase Requests
+        <!-- My History (Stage 3 only) -->
+        {% if user.stage == 3 %}
+        <a class="nb-link" href="{% url 'inventory:my_history' %}">
+            <i class="bi bi-person-lines-fill"></i> My History
         </a>
         {% endif %}
 
-        <!-- Reports -->
+        <!-- History (Reports) -->
         {% if user_can_manage_users %}
         <div class="dropdown">
             <a class="nb-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                <i class="bi bi-graph-up"></i> Reports <i class="bi bi-chevron-down"></i>
+                <i class="bi bi-graph-up"></i> History <i class="bi bi-chevron-down"></i>
             </a>
             <ul class="dropdown-menu nb-dropdown">
                 <li><a class="dropdown-item" href="{% url 'inventory:reports_logins' %}"><i class="bi bi-bar-chart"></i>
@@ -1083,15 +1099,10 @@
                             class="bi bi-pencil-square"></i> All Updates</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:reports_deleted_history' %}"><i
                             class="bi bi-trash"></i> Deleted History</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:user_stage_history' %}"><i
+                            class="bi bi-person-gear"></i> User Stage History</a></li>
             </ul>
         </div>
-        {% endif %}
-
-        <!-- My History -->
-        {% if user.stage == 3 %}
-        <a class="nb-link" href="{% url 'inventory:my_history' %}">
-            <i class="bi bi-clock-history"></i> My History
-        </a>
         {% endif %}
 
         <!-- RIGHT SIDE -->
@@ -1176,11 +1187,11 @@
                     if (progress) progress.style.width = '0%';
                 }, 100);
 
-                // Auto hide after 3 seconds
+                // Auto hide after 1 second
                 setTimeout(() => {
                     overlay.classList.remove('active');
                     setTimeout(() => overlay.remove(), 400);
-                }, 3000);
+                }, 1000);
             }
         });
     </script>

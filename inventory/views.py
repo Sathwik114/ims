@@ -22,7 +22,7 @@ from django.contrib.auth import get_user_model
 from .models import (
     User, Product, Rack, IssueRequest, IssueHistory, PeripheralApplication,
     UploadHistory, Order, ManagementUploadRequest,
-    LoginHistory, DeletedHistory,
+    LoginHistory, DeletedHistory, UserStageHistory, TemporaryItemHistory, ReturnedItem,
     CATEGORY_CHOICES,
 )
 
@@ -175,7 +175,11 @@ def _as_decimal(value):
 def _notify_issue_request_created(ir: IssueRequest, request=None):
     """Notify Stage 1 and Stage 2 users that a new request needs approval."""
     approvers = User.objects.filter(stage__in=[1, 2]) | User.objects.filter(is_superuser=True)
-    req_name = ir.requested_by.full_name or ir.requested_by.username
+    # Use requested_by_username and requested_by_full_name for non-Django users
+    if ir.requested_by:
+        req_name = ir.requested_by.full_name or ir.requested_by.username
+    else:
+        req_name = ir.requested_by_full_name or ir.requested_by_username
     
     # Send email notification to approvers with company emails
     for u in approvers.distinct():
@@ -277,6 +281,29 @@ def login_view(request):
 
                 except Exception:
                     pass
+
+                # Send welcome email (only for stage 3 users)
+                try:
+                    if user.email and user.email.endswith('@gti.nws.cn') and user.is_stage3():
+                        from .utils import send_email_notification
+                        subject = f"Welcome to IT Inventory System"
+                        html_content = f"""
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                            <h2 style="color: #2563eb;">Welcome to IT Inventory System</h2>
+                            <p>Hello {user.get_full_name() or user.username},</p>
+                            <p>You have successfully logged in to the IT Inventory Management System.</p>
+                            <p><strong>Login Details:</strong></p>
+                            <ul>
+                                <li>Username: {user.username}</li>
+                                <li>Time: {timezone.now().strftime('%Y-%m-%d %H:%M')}</li>
+                            </ul>
+                            <p>You can access the system at: <a href="http://10.40.20.4:8000/">http://10.40.20.4:8000/</a></p>
+                            <p style="color: #666; font-size: 12px;">If you did not login, please contact your administrator immediately.</p>
+                        </div>
+                        """
+                        send_email_notification(user.email, subject, html_content)
+                except Exception as e:
+                    print(f"Failed to send welcome email: {e}")
 
                 # Redirect to issue_requests page with login_redirect parameter
                 return redirect('/issue-requests/?login_redirect=1')
@@ -766,7 +793,8 @@ def add_product_global(request):
             return redirect(f"/category/{product.category}/?asset_id={product.asset_id}")
     else:
         form = AddProductForm()
-    return render(request, 'inventory/add_product_global.html', {'form': form})
+        next_asset_id = Product.generate_next_asset_id()
+    return render(request, 'inventory/add_product_global.html', {'form': form, 'next_asset_id': next_asset_id})
 
 
 @login_required
@@ -843,6 +871,7 @@ def edit_product(request, pk):
             return redirect('inventory:view_items')
     else:
         form = AddProductForm(instance=product)
+        form.fields['quantity_available'].widget.attrs['readonly'] = True
     return render(request, 'inventory/add_product_global.html', {'form': form})
 
 
@@ -1048,6 +1077,7 @@ def issue_requests_new(request):
         ir = IssueRequest.objects.create(
             product=product,
             requested_by=request.user,
+            requested_by_username=request.user.username,
             requested_by_full_name=request.user.full_name or request.user.get_full_name() or request.user.username,
             requested_by_mobile=request.user.mobile_number or '',
             quantity=qty,
@@ -1127,6 +1157,186 @@ def issue_requests(request):
 
     products = products_qs
 
+    # Handle new_issue form submission (admin creates issue for another user)
+    if request.method == 'POST' and request.POST.get('action') == 'new_issue':
+        username = request.POST.get('username')
+        product_asset_id = request.POST.get('product_asset_id')
+        quantity = request.POST.get('quantity')
+        reason = request.POST.get('reason')
+        mobile = request.POST.get('mobile', '').strip()
+        department = request.POST.get('department', '').strip()
+        section = request.POST.get('section', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        attachment = request.FILES.get('attachment')
+        request_type = request.POST.get('request_type', 'permanent')
+
+        if not username:
+            messages.error(request, 'Username is required.')
+            return redirect('/issue-requests/?action=new_issue')
+        if not product_asset_id:
+            messages.error(request, 'Please select an item from the search results.')
+            return redirect('/issue-requests/?action=new_issue')
+        if not quantity:
+            messages.error(request, 'Quantity is required.')
+            return redirect('/issue-requests/?action=new_issue')
+        if not reason:
+            messages.error(request, 'Reason is required.')
+            return redirect('/issue-requests/?action=new_issue')
+
+        product = get_object_or_404(Product, asset_id=product_asset_id)
+
+        if product.quantity_available < int(quantity):
+            messages.error(request, 'Insufficient quantity.')
+            return redirect('/issue-requests/?action=new_issue')
+
+        # Try to get user from Django, if not found, use empmast data
+        try:
+            selected_user = User.objects.get(username=username)
+            issued_to_user = selected_user
+        except User.DoesNotExist:
+            issued_to_user = None
+
+        # Handle file upload with compression
+        attachment_filename = _handle_compressed_upload(attachment, 'issue_request_files') if attachment else None
+
+        # Ensure proper path for Django FileField
+        if attachment_filename and not attachment_filename.startswith('issue_request_files/'):
+            attachment_path = f'issue_request_files/{attachment_filename}'
+        else:
+            attachment_path = attachment_filename
+
+        # Route to TemporaryItemHistory if request type is temporary
+        if request_type == 'temporary':
+            from .models import TemporaryItemHistory
+
+            # Auto-generate request_id with 'Temp' prefix
+            # Get all request_ids that start with 'Temp' and extract the numeric part
+            existing_ids = TemporaryItemHistory.objects.filter(
+                request_id__startswith='Temp'
+            ).values_list('request_id', flat=True)
+
+            # Extract numeric parts
+            numeric_parts = []
+            for rid in existing_ids:
+                if rid and rid.startswith('Temp'):
+                    try:
+                        num = int(rid[4:])  # Remove 'Temp' prefix
+                        numeric_parts.append(num)
+                    except ValueError:
+                        pass
+
+            # Get the maximum numeric part
+            max_num = max(numeric_parts) if numeric_parts else 0
+            new_request_id = f'Temp{max_num + 1}' if max_num >= 1000 else 'Temp1000'
+
+            TemporaryItemHistory.objects.create(
+                request_id=new_request_id,
+                product=product,
+                issued_to=issued_to_user,
+                issued_by=request.user,
+                quantity=int(quantity),
+                reason=reason,
+                status='issued'
+            )
+
+            # Update product quantity
+            product.quantity_available -= int(quantity)
+            product.save()
+
+            messages.success(request, 'Temporary item issued successfully.')
+            return redirect('/issue-requests/')
+
+        # For permanent requests, continue with existing IssueRequest logic
+        try:
+            selected_user = User.objects.get(username=username)
+            user_full_name = selected_user.full_name or selected_user.get_full_name() or selected_user.username
+            user_mobile = mobile or selected_user.mobile_number or ''
+            user_department = selected_user.department
+            user_section = selected_user.section
+            confirmed_by_user = selected_user
+        except User.DoesNotExist:
+            # User doesn't exist in Django, use empmast data or form data
+            from .models import get_employee_data_from_mssql
+            mssql_data = get_employee_data_from_mssql(username)
+            if mssql_data:
+                user_full_name = mssql_data.get('full_name', full_name or username)
+                user_mobile = mobile or mssql_data.get('mobile_number', '')
+                user_department = department or mssql_data.get('department', '')
+                user_section = section or mssql_data.get('section', '')
+            else:
+                user_full_name = full_name or username
+                user_mobile = mobile or ''
+                user_department = department or ''
+                user_section = section or ''
+            confirmed_by_user = None  # No Django user to confirm
+
+        # Create issue request with status based on user existence
+        if confirmed_by_user:
+            # User exists in Django - needs confirmation
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=confirmed_by_user,
+                requested_by_username=username,
+                requested_by_full_name=user_full_name,
+                requested_by_mobile=user_mobile,
+                requested_by_department=user_department,
+                requested_by_section=user_section,
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_ISSUED,
+                needs_confirmation=True,
+                # Auto-populate approved and issued fields
+                approved_by=request.user,
+                approved_by_department=request.user.department,
+                approved_by_section=request.user.section,
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_department=request.user.department,
+                issued_by_section=request.user.section,
+                issued_at=timezone.now(),
+            )
+        else:
+            # User doesn't exist in Django - auto-confirm
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=None,
+                requested_by_username=username,
+                requested_by_full_name=user_full_name,
+                requested_by_mobile=user_mobile,
+                requested_by_department=user_department,
+                requested_by_section=user_section,
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_CONFIRMED,
+                needs_confirmation=False,
+                # Auto-populate approved, issued, and confirmed fields
+                approved_by=request.user,
+                approved_by_department=request.user.department,
+                approved_by_section=request.user.section,
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_department=request.user.department,
+                issued_by_section=request.user.section,
+                issued_at=timezone.now(),
+                confirmed_by=request.user,
+                confirmed_by_department=request.user.department,
+                confirmed_by_section=request.user.section,
+                confirmed_at=timezone.now(),
+            )
+
+        # Update product quantity
+        product.quantity_available -= int(quantity)
+        product.save()
+
+        _notify_issue_request_created(ir, request)
+        if confirmed_by_user:
+            messages.success(request, 'Issue request created and issued. User must confirm receipt.')
+        else:
+            messages.success(request, 'Issue request created and auto-confirmed (user not in Django).')
+        return redirect('/issue-requests/')
+
     # Stage 3 and Stage 1/2 can create requests
     if (request.user.is_stage3() or request.user.can_approve_issue_requests()) and request.method == 'POST' and request.POST.get('action') == 'request':
         form = IssueRequestForm(request.POST, request.FILES)
@@ -1165,6 +1375,7 @@ def issue_requests(request):
         ir = IssueRequest.objects.create(
             product=product,
             requested_by=request.user,
+            requested_by_username=request.user.username,
             requested_by_full_name=request.user.full_name or request.user.get_full_name() or request.user.username,
             requested_by_mobile=request.user.mobile_number or '',
             quantity=qty,
@@ -1218,11 +1429,9 @@ def issue_requests(request):
             status__in=[IssueRequest.STATUS_PENDING, IssueRequest.STATUS_APPROVED, IssueRequest.STATUS_ISSUED]
         ).select_related('product', 'requested_by', 'approved_by', 'rejected_by', 'issued_by', 'confirmed_by').order_by('-created_at')[:50]
     else:
-        # Stage 1/2: Show all requests they need to act on
+        # Stage 1/2: Show only issued requests for User Confirmation Pending table
         my_action_items = IssueRequest.objects.filter(
-            Q(status=IssueRequest.STATUS_PENDING) |
-            Q(status=IssueRequest.STATUS_APPROVED) |
-            Q(status=IssueRequest.STATUS_ISSUED)
+            status=IssueRequest.STATUS_ISSUED
         ).select_related('product', 'requested_by', 'approved_by', 'rejected_by', 'issued_by', 'confirmed_by').order_by('-created_at')[:50]
     
     return render(request, 'inventory/issue_requests.html', {
@@ -1238,6 +1447,74 @@ def issue_requests(request):
         'confirmed_requests': confirmed_requests,
         'my_action_items': my_action_items,
     })
+
+
+@login_required
+def temporary_item_history(request):
+    """Display temporary item history with pending and returned items."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can view temporary item history.')
+        return redirect('inventory:dashboard')
+
+    from .models import TemporaryItemHistory
+
+    pending_q = request.GET.get('pending_q', '').strip()
+    returned_q = request.GET.get('returned_q', '').strip()
+
+    # Base queries
+    pending_items = TemporaryItemHistory.objects.filter(status='issued').select_related('product', 'issued_to', 'issued_by')
+    returned_items = TemporaryItemHistory.objects.filter(status='returned').select_related('product', 'issued_to', 'issued_by', 'taken_by')
+
+    # Apply search filter for pending items
+    if pending_q:
+        pending_items = pending_items.filter(
+            Q(request_id__icontains=pending_q) |
+            Q(product__asset_id__icontains=pending_q) |
+            Q(product__item_name__icontains=pending_q) |
+            Q(issued_to__username__icontains=pending_q)
+        )
+
+    # Apply search filter for returned items
+    if returned_q:
+        returned_items = returned_items.filter(
+            Q(request_id__icontains=returned_q) |
+            Q(product__asset_id__icontains=returned_q) |
+            Q(product__item_name__icontains=returned_q) |
+            Q(issued_to__username__icontains=returned_q)
+        )
+
+    return render(request, 'inventory/temporary_item_history.html', {
+        'pending_items': pending_items,
+        'returned_items': returned_items,
+        'pending_q': pending_q,
+        'returned_q': returned_q,
+    })
+
+
+@login_required
+@require_POST
+def return_temp_item(request, pk):
+    """Return a temporary item and update the history."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can return temporary items.')
+        return redirect('inventory:dashboard')
+
+    from .models import TemporaryItemHistory
+
+    temp_item = get_object_or_404(TemporaryItemHistory, pk=pk, status='issued')
+
+    # Update the temporary item
+    temp_item.status = 'returned'
+    temp_item.returned_at = timezone.now()
+    temp_item.taken_by = request.user
+    temp_item.save()
+
+    # Increment product quantity
+    temp_item.product.quantity_available += temp_item.quantity
+    temp_item.product.save()
+
+    messages.success(request, f'Temporary item {temp_item.product.asset_id} returned successfully.')
+    return redirect('inventory:temporary_item_history')
 
 
 @login_required
@@ -1501,15 +1778,45 @@ def issue_request_issue(request, pk):
         unit_price=unit_price,
         total_cost=total_cost,
     )
-    ir.status = IssueRequest.STATUS_ISSUED
     ir.issued_by = request.user
     ir.issued_by_section = request.user.section  # Capture user section
     ir.issued_by_department = request.user.department  # Capture user department
     ir.issued_at = timezone.now()
-    ir.save()
-    # Send email notification for issued status
-    send_issue_request_email(ir, 'issued', request)
-    messages.success(request, 'Marked as issued (issue completed).')
+
+    # Check if the user exists in Django
+    user_exists = False
+    if ir.requested_by:
+        user_exists = True
+    elif ir.requested_by_username:
+        # Check if username exists in Django
+        try:
+            user = User.objects.get(username=ir.requested_by_username)
+            ir.requested_by = user
+            user_exists = True
+        except User.DoesNotExist:
+            user_exists = False
+
+    if user_exists:
+        # User exists in Django - needs confirmation
+        ir.needs_confirmation = True
+        ir.status = IssueRequest.STATUS_ISSUED
+        ir.save()
+        # Send email notification for issued status
+        send_issue_request_email(ir, 'issued', request)
+        messages.success(request, 'Marked as issued. Confirmation request sent to user.')
+    else:
+        # User doesn't exist in Django - auto-confirm
+        ir.needs_confirmation = False
+        ir.status = IssueRequest.STATUS_CONFIRMED
+        ir.confirmed_by = request.user
+        ir.confirmed_by_section = request.user.section
+        ir.confirmed_by_department = request.user.department
+        ir.confirmed_at = timezone.now()
+        ir.save()
+        # Send email notification for confirmed status
+        send_issue_request_email(ir, 'confirmed', request)
+        messages.success(request, 'Marked as issued and auto-confirmed (user not in Django).')
+
     return redirect('inventory:issue_requests')
 
 
@@ -1557,6 +1864,109 @@ def issue_request_confirm(request, pk):
     send_issue_request_email(ir, 'confirmed', request)
     messages.success(request, 'Receipt confirmed. Request completed.')
     return redirect('inventory:issue_requests')
+
+
+@login_required
+def return_item(request):
+    """Return an item - form similar to +new form (except temporary, permanent, upload file)."""
+    if not request.user.can_approve_issue_requests():
+        messages.error(request, 'Only Stage 1/2 users can return items.')
+        return redirect('inventory:dashboard')
+
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        product_asset_id = request.POST.get('product_asset_id')
+        quantity = request.POST.get('quantity')
+        reason = request.POST.get('reason')
+        mobile = request.POST.get('mobile', '').strip()
+        department = request.POST.get('department', '').strip()
+        section = request.POST.get('section', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+
+        if not username:
+            messages.error(request, 'Username is required.')
+            return redirect('inventory:return_item')
+        if not product_asset_id:
+            messages.error(request, 'Please select an item from the search results.')
+            return redirect('inventory:return_item')
+        if not quantity:
+            messages.error(request, 'Quantity is required.')
+            return redirect('inventory:return_item')
+        if not reason:
+            messages.error(request, 'Reason is required.')
+            return redirect('inventory:return_item')
+
+        product = get_object_or_404(Product, asset_id=product_asset_id)
+
+        # Try to get user from Django, if not found, use empmast data
+        try:
+            selected_user = User.objects.get(username=username)
+            returned_by_user = selected_user
+            user_full_name = selected_user.full_name or selected_user.get_full_name() or selected_user.username
+            user_mobile = mobile or selected_user.mobile_number or ''
+            user_department = department or selected_user.department
+            user_section = section or selected_user.section
+        except User.DoesNotExist:
+            returned_by_user = None
+            from .models import get_employee_data_from_mssql
+            mssql_data = get_employee_data_from_mssql(username)
+            if mssql_data:
+                user_full_name = mssql_data.get('full_name', full_name or username)
+                user_mobile = mobile or mssql_data.get('mobile_number', '')
+                user_department = department or mssql_data.get('department', '')
+                user_section = section or mssql_data.get('section', '')
+            else:
+                user_full_name = full_name or username
+                user_mobile = mobile or ''
+                user_department = department or ''
+                user_section = section or ''
+
+        # Create returned item record
+        returned_item = ReturnedItem.objects.create(
+            product=product,
+            returned_by=returned_by_user if returned_by_user else request.user,
+            returned_by_section=request.user.section,
+            returned_by_department=request.user.department,
+            username=username,
+            full_name=user_full_name,
+            department=user_department,
+            section=user_section,
+            quantity=int(quantity),
+            reason=reason,
+        )
+
+        # Increase product quantity
+        product.quantity_available += int(quantity)
+        product.save()
+
+        messages.success(request, 'Item returned successfully. Quantity updated.')
+        return redirect('inventory:returned_history')
+
+    return render(request, 'inventory/return_item.html')
+
+
+@login_required
+def returned_history(request):
+    """View returned items history."""
+    if not request.user.can_approve_issue_requests():
+        messages.error(request, 'Only Stage 1/2 users can view returned history.')
+        return redirect('inventory:dashboard')
+
+    search_q = request.GET.get('q', '').strip()
+    returned_items = ReturnedItem.objects.all().select_related('product', 'returned_by', 'taken_by').order_by('-returned_at')
+
+    if search_q:
+        returned_items = returned_items.filter(
+            Q(username__icontains=search_q) |
+            Q(full_name__icontains=search_q) |
+            Q(product__asset_id__icontains=search_q) |
+            Q(product__item_name__icontains=search_q)
+        )
+
+    return render(request, 'inventory/returned_history.html', {
+        'returned_items': returned_items,
+        'search_q': search_q,
+    })
 
 
 # ---- Upload Items / Upload History ----
@@ -2155,9 +2565,31 @@ def issue_history_pdf(request, category):
 @login_required
 def my_history(request):
     """Stage 3: show my requests and issued items history."""
+    search_requests = request.GET.get('search_requests', '').strip()
+    search_issued = request.GET.get('search_issued', '').strip()
+    
     my_requests = IssueRequest.objects.filter(requested_by=request.user).select_related('product').order_by('-created_at')[:200]
     my_issued = IssueHistory.objects.filter(receiver=request.user).select_related('product', 'issued_by', 'approved_by').order_by('-issued_at')[:200]
-    return render(request, 'inventory/my_history.html', {'my_requests': my_requests, 'my_issued': my_issued})
+    
+    if search_requests:
+        my_requests = my_requests.filter(
+            Q(request_id__icontains=search_requests) |
+            Q(product__asset_id__icontains=search_requests) |
+            Q(product__item_name__icontains=search_requests)
+        )
+    
+    if search_issued:
+        my_issued = my_issued.filter(
+            Q(product__asset_id__icontains=search_issued) |
+            Q(product__item_name__icontains=search_issued)
+        )
+    
+    return render(request, 'inventory/my_history.html', {
+        'my_requests': my_requests, 
+        'my_issued': my_issued,
+        'search_requests': search_requests,
+        'search_issued': search_issued,
+    })
 
 
 @login_required
@@ -2370,6 +2802,7 @@ def item_requests_history_excel(request):
 def management_upload_requests(request):
 
     category = request.GET.get('category', '').strip()
+    search = request.GET.get('search', '').strip()
 
     if request.user.stage == 3 and not request.user.is_superuser:
         messages.error(request, 'Upload Requests are only available for Stage 1 and Stage 2.')
@@ -2382,27 +2815,51 @@ def management_upload_requests(request):
     if category:
         qs = qs.filter(product__category=category)
 
+    if search:
+        qs = qs.filter(
+            Q(request_id__icontains=search) |
+            Q(pk__icontains=search) |
+            Q(product__asset_id__icontains=search) |
+            Q(product__item_name__icontains=search)
+        )
+
     products = Product.objects.all().order_by('category', 'asset_id')
 
     if request.method == 'POST' and request.POST.get('action') == 'request':
+        # Handle multiple items
+        items = []
+        i = 0
+        while True:
+            asset_id = request.POST.get(f'asset_id_{i}', '').strip()
+            qty = request.POST.get(f'quantity_requested_{i}', '').strip()
+            if not asset_id:
+                break
+            if not qty.isdigit() or int(qty) <= 0:
+                messages.error(request, f'Enter a valid quantity for item {i + 1}.')
+                return redirect('inventory:management_upload_requests')
+            items.append({'asset_id': asset_id, 'quantity': int(qty)})
+            i += 1
 
-        asset_id = request.POST.get('asset_id', '').strip()
-        qty = request.POST.get('quantity_requested', '').strip()
-
-        if not asset_id or not qty.isdigit() or int(qty) <= 0:
-            messages.error(request, 'Select Asset ID and enter a valid quantity.')
+        if not items:
+            messages.error(request, 'Please add at least one item.')
             return redirect('inventory:management_upload_requests')
 
-        product = get_object_or_404(Product, asset_id=asset_id)
+        material_upload_form_file = request.FILES.get('material_upload_form')
 
-        ManagementUploadRequest.objects.create(
-            product=product,
-            requested_by=request.user,
-            quantity_requested=int(qty),
-            status=ManagementUploadRequest.STATUS_PENDING,
-        )
+        # Create separate records for each item, all sharing the same PDF file
+        created_count = 0
+        for item in items:
+            product = get_object_or_404(Product, asset_id=item['asset_id'])
+            ManagementUploadRequest.objects.create(
+                product=product,
+                requested_by=request.user,
+                quantity_requested=item['quantity'],
+                status=ManagementUploadRequest.STATUS_PENDING,
+                material_upload_form=material_upload_form_file,
+            )
+            created_count += 1
 
-        messages.success(request, 'Upload request saved (internal).')
+        messages.success(request, f'{created_count} upload request(s) saved (internal).')
         return redirect('inventory:management_upload_requests')
 
     reqs = list(qs[:300])
@@ -2417,6 +2874,7 @@ def management_upload_requests(request):
         'requests': reqs,
         'products': products,
         'selected_category': category,
+        'search': search,
         'categories': [{'slug': c[0], 'name': c[1]} for c in CATEGORY_CHOICES],
         'can_fulfill': request.user.stage in [1, 2] or request.user.is_superuser,
     })
@@ -3308,24 +3766,67 @@ def add_user(request):
     if not request.user.can_manage_users():
         messages.error(request, 'Only Stage 1 users can add users.')
         return redirect('inventory:dashboard')
-    
+
     if request.method == 'POST':
-        form = AddUserForm(request.POST)
-        if form.is_valid():
+        users = []
+        i = 0
+        while True:
+            username = request.POST.get(f'username_{i}', '').strip()
+            if not username:
+                break
+            stage = request.POST.get(f'stage_{i}', '').strip()
+            full_name = request.POST.get(f'full_name_{i}', '').strip()
+            email = request.POST.get(f'email_{i}', '').strip()
+            mobile_number = request.POST.get(f'mobile_number_{i}', '').strip()
+            department = request.POST.get(f'department_{i}', '').strip()
+            section = request.POST.get(f'section_{i}', '').strip()
+
+            if not username or not full_name or not stage:
+                messages.error(request, f'Please fill in all required fields for user {i + 1}.')
+                return redirect('inventory:add_user')
+
+            users.append({
+                'username': username,
+                'stage': int(stage),
+                'full_name': full_name,
+                'email': email,
+                'mobile_number': mobile_number,
+                'department': department,
+                'section': section
+            })
+            i += 1
+
+        if not users:
+            messages.error(request, 'Please add at least one user.')
+            return redirect('inventory:add_user')
+
+        created_count = 0
+        failed_count = 0
+        for user_data in users:
             try:
-                user = form.save()
-                messages.success(request, f'User "{user.username}" created successfully with default password: temp123456')
-                return redirect('inventory:profile')
+                user = User.objects.create_user(
+                    username=user_data['username'],
+                    email=user_data['email'] or f"{user_data['username']}@gti.nws.cn",
+                    full_name=user_data['full_name'],
+                    stage=user_data['stage'],
+                    mobile_number=user_data['mobile_number'],
+                    department=user_data['department'],
+                    section=user_data['section'],
+                    password='temp123456'
+                )
+                created_count += 1
             except Exception as e:
-                messages.error(request, f'Error creating user: {str(e)}')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f'{field.title()}: {error}')
-    else:
-        form = AddUserForm()
-    
-    return render(request, 'inventory/add_user.html', {'form': form})
+                failed_count += 1
+                messages.error(request, f'Error creating user "{user_data["username"]}": {str(e)}')
+
+        if created_count > 0:
+            messages.success(request, f'{created_count} user(s) created successfully with default password: temp123456')
+        if failed_count > 0:
+            messages.error(request, f'{failed_count} user(s) failed to create.')
+
+        return redirect('inventory:profile')
+
+    return render(request, 'inventory/add_user.html')
 
 
 @login_required
@@ -3515,8 +4016,10 @@ def rack_detail(request, rack_id):
     rack = get_object_or_404(Rack, pk=rack_id)
     
     # Get all products in this rack
-    products = Product.objects.filter(rack=rack).annotate(
-        on_order=Coalesce(
+    # Include both regular orders and purchase requests in on_order calculation
+    products = Product.objects.filter(rack=rack).select_related('rack').annotate(
+        # Calculate on_order from regular orders
+        regular_orders_on_order=Coalesce(
             Sum(
                 Case(
                     When(
@@ -3525,10 +4028,28 @@ def rack_detail(request, rack_id):
                     ),
                     default=0,
                     output_field=IntegerField(),
-                    )
-                ),
-                0,
-            )
+                )
+            ),
+            0,
+        ),
+        # Calculate on_order from purchase requests
+        purchase_requests_on_order=Coalesce(
+            Sum(
+                Case(
+                    When(
+                        management_upload_requests__status=ManagementUploadRequest.STATUS_PENDING,
+                        then=F('management_upload_requests__quantity_requested') - F('management_upload_requests__quantity_received'),
+                    ),
+                    default=0,
+                    output_field=IntegerField(),
+                )
+            ),
+            0,
+        )
+    ).annotate(
+        # Total on_order is sum of both regular orders and purchase requests
+        on_order=F('regular_orders_on_order') + F('purchase_requests_on_order'),
+        total_items=F('quantity_available') + F('on_order')
     ).order_by('asset_id')
     
     # Calculate total value for the rack
@@ -3565,26 +4086,132 @@ def toggle_user_status(request, user_id):
     if not request.user.can_manage_users():
         messages.error(request, 'Only Stage 1 users can manage user status.')
         return redirect('inventory:dashboard')
-    
+
     target = get_object_or_404(User, pk=user_id)
-    
+
     # Prevent toggling superusers or other Stage 1 users
     if target.is_superuser or target.can_manage_users():
         messages.error(request, 'You cannot change the status of this user.')
         return redirect('inventory:manage_users')
-    
+
     # Prevent self-deactivation
     if target == request.user:
         messages.error(request, 'You cannot disable your own account.')
         return redirect('inventory:manage_users')
-    
+
     # Toggle status
     target.is_active = not target.is_active
     target.save()
-    
+
     status_text = "enabled" if target.is_active else "disabled"
     messages.success(request, f'User "{target.username}" {status_text}.')
     return redirect('inventory:manage_users')
+
+
+@login_required
+def edit_user_stage(request):
+    """Edit user stage with data migration."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can edit user stages.')
+        return redirect('inventory:dashboard')
+
+    if request.method != 'POST':
+        return redirect('inventory:manage_users')
+
+    user_id = request.POST.get('user_id')
+    new_stage = request.POST.get('new_stage')
+
+    if not user_id or not new_stage:
+        messages.error(request, 'Invalid request.')
+        return redirect('inventory:manage_users')
+
+    target = get_object_or_404(User, pk=user_id)
+
+    # Prevent editing superusers only (allow changing other Stage 1 users)
+    if target.is_superuser:
+        messages.error(request, 'You cannot change the stage of this user.')
+        return redirect('inventory:manage_users')
+
+    # Prevent changing own stage
+    if target == request.user:
+        messages.error(request, 'You cannot change your own stage.')
+        return redirect('inventory:manage_users')
+
+    old_stage = target.stage
+    new_stage = int(new_stage)
+
+    if old_stage == new_stage:
+        messages.info(request, 'User stage is already set to Stage ' + str(new_stage))
+        return redirect('inventory:manage_users')
+
+    # Get client IP and hostname using the same method as login history
+    ip, hostname = get_client_ip(request)
+    print(f"DEBUG: IP={ip}, Hostname={hostname}")
+
+    # Store old stage for history (same pattern as login history)
+    UserStageHistory.objects.create(
+        user=target,
+        old_stage=old_stage,
+        new_stage=new_stage,
+        changed_by=request.user,
+        ip_address=ip[:64] if ip else '',
+        hostname=hostname[:255] if hostname else ''
+    )
+
+    # Data migration when changing from stage 1 to stage 2 or 3
+    if old_stage == 1 and new_stage in [2, 3]:
+        # Update IssueRequest records (Request an Item)
+        target.issue_requests_made.update(
+            requested_by_username=target.username,
+            requested_by_full_name=target.full_name or '',
+            requested_by_mobile=target.mobile_number or '',
+            requested_by_department=target.department or '',
+            requested_by_section=target.section or ''
+        )
+
+        # Update IssueHistory records where user is the issuer
+        target.issues_made.update(
+            issued_by_section=target.section or '',
+            issued_by_department=target.department or ''
+        )
+
+        # Update IssueHistory records where user is the approver
+        target.issues_approved.update(
+            approved_by_section=target.section or '',
+            approved_by_department=target.department or ''
+        )
+
+        # Update TemporaryItemHistory records
+        TemporaryItemHistory.objects.filter(issued_to=target).update(
+            # Update denormalized fields if needed
+        )
+
+        # Update ManagementUploadRequest records
+        target.management_upload_requests_made.update(
+            # Update denormalized fields if needed
+        )
+
+    # Update user stage
+    target.stage = new_stage
+    target.save()
+
+    migration_message = ''
+    if old_stage == 1 and new_stage in [2, 3]:
+        migration_message = ' Data has been migrated for Request an Item and My History.'
+
+    messages.success(request, f'User "{target.username}" stage changed from Stage {old_stage} to Stage {new_stage}.{migration_message}')
+    return redirect('inventory:manage_users')
+
+
+@login_required
+def user_stage_history(request):
+    """Display user stage change history."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can view user stage history.')
+        return redirect('inventory:dashboard')
+
+    history = UserStageHistory.objects.all().order_by('-changed_at')
+    return render(request, 'inventory/user_stage_history.html', {'history': history})
 
 
 @login_required

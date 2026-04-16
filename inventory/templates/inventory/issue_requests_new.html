@@ -39,8 +39,22 @@
         </div>
     </div>
 
+    <!-- Toggle Buttons -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button class="btn btn-primary" id="btn_incomplete" onclick="showSection('incomplete')" style="flex:1;">
+                    My incomplete requests (<span id="incomplete_count">0</span>)
+                </button>
+                <button class="btn btn-outline-secondary" id="btn_confirmation" onclick="showSection('confirmation')" style="flex:1;">
+                    My confirmation pending ({{ issued_requests|length }})
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- My Requests -->
-    <div class="card">
+    <div class="card" id="section_incomplete">
         <div class="card-body">
             <h6 class="card-title">My requests (All Status)</h6>
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -51,15 +65,17 @@
                             <th>Item</th>
                             <th>Qty</th>
                             <th>Your Dept|Section</th>
-                            <th>Status</th>
                             <th>Approved by</th>
                             <th>Issued by</th>
                             <th>Confirmed by</th>
+                            <th>Rejected by</th>
+                            <th>Rejected reason</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for ir in my_requests %}
+                        {% if ir.status != 'confirmed' and ir.status != 'rejected' %}
                         <tr>
                             <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
                             <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
@@ -71,17 +87,6 @@
                                 {% else %}
                                     -
                                 {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge bg-{{ 
-                                    'secondary' if ir.status == 'pending' else
-                                    'success' if ir.status == 'approved' else
-                                    'primary' if ir.status == 'issued' else
-                                    'info' if ir.status == 'confirmed' else
-                                    'danger'
-                                }}">
-                                    {{ ir.get_status_display }}
-                                </span>
                             </td>
                             <td>
                                 {% if ir.approved_by %}
@@ -108,23 +113,33 @@
                                 {% endif %}
                             </td>
                             <td>
+                                {% if ir.rejected_by %}
+                                    {{ ir.rejected_by.username }}
+                                    {% if ir.rejected_by_full_name %}<br><span class="text-muted small">{{ ir.rejected_by_full_name }}</span>{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ ir.rejection_reason|default:"—" }}</td>
+                            <td>
                                 {% if ir.status == 'issued' %}
                                     <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}" class="d-inline">{% csrf_token %}
                                         <button class="btn btn-sm btn-success" type="submit" onclick="return confirm('Confirm receipt of this item?')">
                                             Confirm
                                         </button>
                                     </form>
-                                {% elif ir.status == 'confirmed' %}
-                                    <span class="badge bg-info">Confirmed</span>
                                 {% elif ir.status == 'pending' %}
-                                    <span class="badge bg-secondary">Pending</span>
+                                    <span class="badge bg-warning text-dark">Pending</span>
                                 {% elif ir.status == 'approved' %}
                                     <span class="badge bg-success">Approved</span>
+                                {% elif ir.status == 'rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
                                 {% endif %}
                             </td>
                         </tr>
+                        {% endif %}
                         {% empty %}
-                        <tr><td colspan="9" class="text-muted">No requests yet.</td></tr>
+                        <tr><td colspan="10" class="text-muted">No requests yet.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -133,8 +148,7 @@
     </div>
 
     <!-- User Confirmation Pending -->
-    {% if issued_requests %}
-    <div class="card mb-3 border-warning">
+    <div class="card mb-3 border-warning" id="section_confirmation">
         <div class="card-body">
             <h6 class="card-title">Items issued to you (Confirmation pending)</h6>
             <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
@@ -173,7 +187,6 @@
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
 <script>
@@ -240,6 +253,30 @@ document.addEventListener('DOMContentLoaded', function() {
             suggestionsDiv.style.display = 'none';
         }
     });
+});
+
+// Toggle between sections
+function showSection(sectionType) {
+  // Hide both sections
+  document.getElementById('section_incomplete').style.display = 'none';
+  document.getElementById('section_confirmation').style.display = 'none';
+  
+  // Reset button styles
+  document.getElementById('btn_incomplete').className = 'btn btn-outline-secondary';
+  document.getElementById('btn_confirmation').className = 'btn btn-outline-secondary';
+  
+  // Show selected section and highlight button
+  document.getElementById('section_' + sectionType).style.display = 'block';
+  document.getElementById('btn_' + sectionType).className = 'btn btn-primary';
+}
+
+// Set default visibility
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('section_confirmation').style.display = 'none';
+  
+  // Calculate actual count of visible rows in My Requests table
+  const incompleteCount = document.querySelectorAll('#section_incomplete tbody tr').length;
+  document.getElementById('incomplete_count').textContent = incompleteCount;
 });
 </script>
 {% endblock %}

@@ -398,6 +398,8 @@
                         <th>Asset ID</th>
                         <th>Item Name</th>
                         <th>Category</th>
+                        <th>Row</th>
+                        <th>Column</th>
                         <th>On Hand</th>
                         <th>On Order</th>
                         <th>Total</th>
@@ -417,6 +419,8 @@
                             </span>
                             {% endwith %}
                         </td>
+                        <td><span class="n-chip">{{ item.product.row_number|default:"—" }}</span></td>
+                        <td><span class="n-chip">{{ item.product.column_number|default:"—" }}</span></td>
                         <td><span class="n-chip">{{ item.product.quantity_available }}</span></td>
                         <td>
                             <span class="n-chip {% if item.product.on_order == 0 %}zero{% endif %}">

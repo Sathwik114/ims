@@ -1,0 +1,374 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Return an Item{% endblock %}
+{% block content %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --ink:       #0f1117;
+    --ink-2:     #2b2f3a;
+    --ink-3:     #6b7280;
+    --surface:   #f8f9fb;
+    --card:      #ffffff;
+    --border:    #e4e7ed;
+    --accent:    #2563eb;
+    --accent-lt: #eff4ff;
+    --warn:      #d97706;
+    --warn-lt:   #fffbeb;
+    --ok:        #059669;
+    --ok-lt:     #ecfdf5;
+    --danger:    #dc2626;
+    --danger-lt: #fef2f2;
+    --info:      #0891b2;
+    --info-lt:   #ecfeff;
+    --radius:    10px;
+    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.07);
+  }
+
+  .ri-page {
+    font-family: 'Noto Sans', sans-serif;
+    color: var(--ink);
+    background: var(--surface);
+    min-height: 100vh;
+    padding: 2rem 1.25rem 3rem;
+  }
+
+  .ri-page-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 2rem;
+  }
+
+  .ri-page-header h1 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .ri-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+    overflow: visible;
+  }
+
+  .ri-card-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: 1rem 1.25rem .85rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ri-card-header .card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    flex-shrink: 0;
+  }
+
+  .icon-blue  { background: var(--accent-lt); color: var(--accent); }
+  .icon-warn  { background: var(--warn-lt);   color: var(--warn); }
+  .icon-green { background: var(--ok-lt);     color: var(--ok); }
+  .icon-info  { background: var(--info-lt);   color: var(--info); }
+
+  .ri-card-header h2 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .ri-card-body {
+    padding: 1.25rem;
+  }
+
+  .form-field label {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ink-3);
+    margin-bottom: .25rem;
+    display: block;
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+
+  #item_suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+    box-shadow: var(--shadow-md);
+  }
+
+  #item_suggestions .suggestion-item {
+    padding: .5rem .75rem;
+    cursor: pointer;
+    font-size: .85rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #item_suggestions .suggestion-item:hover {
+    background: var(--surface);
+  }
+
+  #item_suggestions .suggestion-item:last-child {
+    border-bottom: none;
+  }
+
+  .btn-ir {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .5rem 1rem;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-3);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    background: var(--surface);
+    color: var(--ink);
+  }
+</style>
+
+<div class="ri-page">
+
+  <div class="ri-page-header">
+    <span class="page-eyebrow">Inventory</span>
+    <h1>Return an Item</h1>
+  </div>
+
+  <div class="ri-card blue-accent">
+    <div class="ri-card-header">
+      <span class="card-icon icon-blue">←</span>
+      <h2>Return an Item</h2>
+    </div>
+    <div class="ri-card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="req-form-grid" style="display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: .5rem;">
+          
+          <div class="form-field">
+            <label>Time</label>
+            <input type="text" id="current_time" readonly style="background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Department</label>
+            <input type="text" id="department" name="department" readonly style="background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Section</label>
+            <input type="text" id="section" name="section" readonly style="background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>User (username)</label>
+            <input type="text" id="username_input" autocomplete="off" placeholder="Enter username..." style="border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; background:var(--surface); width:100%;">
+            <input type="hidden" name="username" id="selected_username" value="">
+          </div>
+          
+          <div class="form-field">
+            <label>Full Name</label>
+            <input type="text" id="full_name" name="full_name" readonly style="background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Mobile <span style="font-weight:400;color:var(--ink-3);">(optional)</span></label>
+            <input type="text" id="mobile" name="mobile" placeholder="Enter mobile number..." style="border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; background:var(--surface); width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Item (search)</label>
+            <div class="search-wrap">
+              <input type="text" id="item_search" autocomplete="off" placeholder="Search item name..." style="border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; outline:none; width:100%; background:var(--surface);">
+              <div id="item_suggestions"></div>
+            </div>
+          </div>
+          
+          <div class="form-field">
+            <label>Item Code</label>
+            <input type="text" id="item_code" readonly style="background:var(--surface); border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Return Qty</label>
+            <input type="number" name="quantity" min="1" required style="border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; background:var(--surface); width:100%;">
+          </div>
+          
+          <div class="form-field">
+            <label>Reason</label>
+            <textarea name="reason" rows="1" required style="border:1.5px solid var(--border); border-radius:7px; padding:.5rem .75rem; font-size:.875rem; background:var(--surface); resize:vertical; width:100%;"></textarea>
+          </div>
+          
+          <div class="submit-col" style="display:flex;gap:0.5rem;">
+            <button type="submit" class="btn-ir btn-primary" style="height:38px;">Save</button>
+            <a href="{% url 'inventory:issue_requests' %}" class="btn-ir btn-ghost" style="height:38px;">Cancel</a>
+          </div>
+        </div>
+        
+        <input type="hidden" name="product_asset_id" id="product_asset_id" value="">
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Set current time
+  const currentTimeInput = document.getElementById('current_time');
+  if (currentTimeInput) {
+    const now = new Date();
+    currentTimeInput.value = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Username input auto-fetch from empmast/LDAP
+  const usernameInput = document.getElementById('username_input');
+  const departmentInput = document.getElementById('department');
+  const sectionInput = document.getElementById('section');
+  const fullNameInput = document.getElementById('full_name');
+  const mobileInput = document.getElementById('mobile');
+  const selectedUsernameInput = document.getElementById('selected_username');
+
+  let usernameTimeout;
+  if (usernameInput) {
+    usernameInput.addEventListener('input', function() {
+      clearTimeout(usernameTimeout);
+      const username = this.value.trim();
+      
+      if (username.length < 2) {
+        selectedUsernameInput.value = '';
+        departmentInput.value = '';
+        sectionInput.value = '';
+        fullNameInput.value = '';
+        return;
+      }
+
+      usernameTimeout = setTimeout(() => {
+        departmentInput.value = 'Fetching...';
+        sectionInput.value = 'Fetching...';
+        fullNameInput.value = 'Fetching...';
+        
+        fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
+          .then(r => r.json())
+          .then(data => {
+            selectedUsernameInput.value = username;
+            departmentInput.value = data.department || '';
+            sectionInput.value = data.section || '';
+            fullNameInput.value = data.full_name || '';
+            mobileInput.value = data.mobile_number || '';
+          })
+          .catch(() => {
+            selectedUsernameInput.value = username;
+            departmentInput.value = '';
+            sectionInput.value = '';
+            fullNameInput.value = '';
+          });
+      }, 500);
+    });
+  }
+
+  // Item search
+  const itemSearch = document.getElementById('item_search');
+  const itemSuggestions = document.getElementById('item_suggestions');
+  const itemCode = document.getElementById('item_code');
+  const productAssetId = document.getElementById('product_asset_id');
+
+  let itemTimeout;
+  if (itemSearch) {
+    itemSearch.addEventListener('input', function() {
+      clearTimeout(itemTimeout);
+      const query = this.value.trim();
+      
+      if (query.length < 2) {
+        itemSuggestions.style.display = 'none';
+        itemCode.value = '';
+        productAssetId.value = '';
+        return;
+      }
+
+      itemTimeout = setTimeout(() => {
+        fetch(`/api/products/search-internal/?q=${encodeURIComponent(query)}`)
+          .then(r => r.json())
+          .then(data => {
+            itemSuggestions.innerHTML = '';
+            if (data.length > 0) {
+              data.forEach(product => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.innerHTML = `
+                  <div style="font-weight:600;">${product.asset_id}</div>
+                  <div style="font-size:.75rem; color:var(--ink-3);">${product.item_code} - ${product.item_name}</div>
+                `;
+                item.addEventListener('click', function() {
+                  itemSearch.value = `${product.asset_id} - ${product.item_name}`;
+                  itemCode.value = product.item_code || '';
+                  productAssetId.value = product.asset_id;
+                  itemSuggestions.style.display = 'none';
+                });
+                itemSuggestions.appendChild(item);
+              });
+              itemSuggestions.style.display = 'block';
+            } else {
+              itemSuggestions.innerHTML = '<div class="suggestion-item">No items found</div>';
+              itemSuggestions.style.display = 'block';
+            }
+          })
+          .catch(() => {
+            itemSuggestions.style.display = 'none';
+          });
+      }, 300);
+    });
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!itemSearch.contains(e.target) && !itemSuggestions.contains(e.target)) {
+        itemSuggestions.style.display = 'none';
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

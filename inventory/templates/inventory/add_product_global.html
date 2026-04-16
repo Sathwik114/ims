@@ -265,6 +265,11 @@
                     <div class="au-field">
                         <label class="au-label">Asset ID</label>
                         {{ form.asset_id }}
+                        {% if next_asset_id %}
+                        <small style="color: #6b7490; font-size: 0.65rem; margin-top: 2px; display: block;">
+                            Next auto-generated ID: <strong>{{ next_asset_id }}</strong>
+                        </small>
+                        {% endif %}
                         {% if form.asset_id.errors %}<div class="au-error">{{ form.asset_id.errors.0 }}</div>{% endif %}
                     </div>
                     <div class="au-field">

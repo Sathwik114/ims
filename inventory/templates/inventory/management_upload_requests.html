@@ -250,7 +250,7 @@
        CREATE FORM LAYOUT
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
     .create-form-grid {
-        display: grid; grid-template-columns: 1fr 140px auto;
+        display: grid; grid-template-columns: 1fr 140px auto auto;
         gap: 1rem; align-items: end;
     }
     @media(max-width:768px){
@@ -504,10 +504,26 @@
         </div>
     </div>
 
+    <!-- ── Toggle Buttons for Stage 1/2 Users ── -->
+    {% if user.stage == 1 or user.stage == 2 %}
+    <div class="au-card" style="animation: fadeUp .4s ease both; animation-delay:.05s;">
+        <div class="au-card-body" style="padding:1rem;">
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button class="au-btn-primary" id="btn_create" onclick="showPurchaseSection('create')" style="flex:1;">
+                    <i class="bi bi-plus-circle"></i> Create Upload Request
+                </button>
+                <button class="au-btn-outline" id="btn_my_requests" onclick="showPurchaseSection('my_requests')" style="flex:1;">
+                    <i class="bi bi-list-check"></i> My Requests
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
          CREATE REQUEST CARD
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <div class="au-card" style="animation: fadeUp .4s ease both; animation-delay:.05s;">
+    <div class="au-card" id="section_create" style="animation: fadeUp .4s ease both; animation-delay:.05s;">
         <div class="au-card-head">
             <div class="au-card-head-title">
                 <i class="bi bi-plus-circle"></i> Create Upload Request
@@ -515,65 +531,167 @@
             <span class="au-stage-pill">New Request</span>
         </div>
         <div class="au-card-body">
-            <form method="post">
+            <form method="post" enctype="multipart/form-data" id="multiItemForm">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="request">
 
                 <!-- Section -->
                 <div class="au-sec">
                     <div class="au-sec-icon"><i class="bi bi-box-seam"></i></div>
-                    <span class="au-sec-label">Asset &amp; Quantity</span>
+                    <span class="au-sec-label">Items</span>
                     <div class="au-sec-rule"></div>
                 </div>
 
-                <div class="create-form-grid">
-                    <!-- Asset search -->
-                    <div class="cf-field">
-                        <label class="au-label">Asset ID / Item Code / Name</label>
-                        <div class="cf-field-inner">
-                            <i class="bi bi-search cf-input-icon"></i>
-                            <input class="cf-input" id="mu_search_input"
-                                   autocomplete="off" placeholder="Start typing to search…" required>
-                            <input type="hidden" name="asset_id" id="mu_asset_id" value="">
-                            <div id="mu_suggestions" class="list-group"></div>
+                <!-- Items Container -->
+                <div id="itemsContainer">
+                    <div class="item-row create-form-grid" data-row-index="0">
+                        <!-- Asset search -->
+                        <div class="cf-field">
+                            <label class="au-label">Asset ID / Item Code / Name</label>
+                            <div class="cf-field-inner">
+                                <input class="cf-input asset-search-input"
+                                       autocomplete="off" placeholder="Start typing to search…" required
+                                       style="padding-left: 0.75rem;" data-row-index="0">
+                                <input type="hidden" name="asset_id_0" id="mu_asset_id_0" value="">
+                                <div id="mu_suggestions_0" class="list-group"></div>
+                            </div>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div class="cf-field">
+                            <label class="au-label">Quantity</label>
+                            <div class="cf-field-inner">
+                                <input type="number" name="quantity_requested_0" class="cf-qty-input"
+                                       min="1" placeholder="e.g. 10" required>
+                            </div>
+                        </div>
+
+                        <!-- Remove Button -->
+                        <div class="cf-field" style="justify-content:flex-end;">
+                            <label class="au-label" style="opacity:0;user-select:none;">​</label>
+                            <button type="button" class="au-btn-sm-outline" onclick="removeItemRow(0)" style="display:none;" id="removeBtn_0">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>
+                        </div>
+
+                        <!-- Add Item Button -->
+                        <div class="cf-field" style="justify-content:flex-end;">
+                            <label class="au-label" style="opacity:0;user-select:none;">​</label>
+                            <button type="button" class="au-btn-outline" onclick="addItemRow()">
+                                <i class="bi bi-plus-circle"></i> Add Item
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Quantity -->
+                <!-- Material Request Form and Save Request in one line -->
+                <div class="create-form-grid" style="margin-top: 1rem;">
                     <div class="cf-field">
-                        <label class="au-label">Quantity</label>
+                        <label class="au-label">Material Request Form (Optional)</label>
                         <div class="cf-field-inner">
-                            <input type="number" name="quantity_requested" class="cf-qty-input"
-                                   min="1" placeholder="e.g. 10" required>
+                            <input type="file" name="material_upload_form" class="file-input-sm" style="width: 100%;">
                         </div>
                     </div>
-
-                    <!-- Submit -->
-                    <div class="cf-field create-form-submit" style="justify-content:flex-end;">
+                    <div class="cf-field"></div>
+                    <div class="cf-field"></div>
+                    <div class="cf-field" style="justify-content:flex-end;">
                         <label class="au-label" style="opacity:0;user-select:none;">​</label>
                         <button type="submit" class="au-btn-primary">
                             <i class="bi bi-floppy-fill"></i> Save Request
                         </button>
                     </div>
                 </div>
-
-                <div class="au-divider"></div>
-                <div class="au-note">
-                    <i class="bi bi-info-circle"></i>
-                    <span>No notifications are sent when a request is created. Requests auto-disclose after <strong>10 days</strong> if not fulfilled.</span>
-                </div>
             </form>
         </div>
     </div>
 
     <script>
-    (function() {
-        const input  = document.getElementById('mu_search_input');
-        const hidden = document.getElementById('mu_asset_id');
-        const list   = document.getElementById('mu_suggestions');
+    let rowCount = 1;
+
+    function addItemRow() {
+        const container = document.getElementById('itemsContainer');
+        const newRow = document.createElement('div');
+        newRow.className = 'item-row create-form-grid';
+        newRow.setAttribute('data-row-index', rowCount);
+
+        newRow.innerHTML = `
+            <div class="cf-field">
+                <label class="au-label">Asset ID / Item Code / Name</label>
+                <div class="cf-field-inner">
+                    <input class="cf-input asset-search-input"
+                           autocomplete="off" placeholder="Start typing to search…" required
+                           style="padding-left: 0.75rem;" data-row-index="${rowCount}">
+                    <input type="hidden" name="asset_id_${rowCount}" id="mu_asset_id_${rowCount}" value="">
+                    <div id="mu_suggestions_${rowCount}" class="list-group"></div>
+                </div>
+            </div>
+            <div class="cf-field">
+                <label class="au-label">Quantity</label>
+                <div class="cf-field-inner">
+                    <input type="number" name="quantity_requested_${rowCount}" class="cf-qty-input"
+                           min="1" placeholder="e.g. 10" required>
+                </div>
+            </div>
+            <div class="cf-field" style="justify-content:flex-end;">
+                <label class="au-label" style="opacity:0;user-select:none;">​</label>
+                <button type="button" class="au-btn-sm-outline" onclick="removeItemRow(${rowCount})">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </div>
+            <div class="cf-field" style="justify-content:flex-end;">
+                <label class="au-label" style="opacity:0;user-select:none;">​</label>
+                <button type="button" class="au-btn-outline" onclick="addItemRow()">
+                    <i class="bi bi-plus-circle"></i> Add Item
+                </button>
+            </div>
+        `;
+
+        container.appendChild(newRow);
+        setupAutocomplete(rowCount);
+
+        // Hide the Add Item button from the previous row
+        const allRows = document.querySelectorAll('.item-row');
+        if (allRows.length > 1) {
+            const prevRow = allRows[allRows.length - 2];
+            const prevAddBtn = prevRow.querySelector('button[onclick="addItemRow()"]');
+            if (prevAddBtn) {
+                prevAddBtn.remove();
+            }
+        }
+
+        // Show remove button for the first row if it's hidden
+        document.getElementById('removeBtn_0').style.display = 'inline-flex';
+
+        rowCount++;
+    }
+
+    function removeItemRow(rowIndex) {
+        const row = document.querySelector(`.item-row[data-row-index="${rowIndex}"]`);
+        if (row) {
+            row.remove();
+        }
+
+        // Hide remove button for the first row if it's the only one left
+        const remainingRows = document.querySelectorAll('.item-row');
+        if (remainingRows.length === 1) {
+            const firstRow = remainingRows[0];
+            const firstRowIndex = firstRow.getAttribute('data-row-index');
+            const removeBtn = document.getElementById(`removeBtn_${firstRowIndex}`);
+            if (removeBtn) {
+                removeBtn.style.display = 'none';
+            }
+        }
+    }
+
+    function setupAutocomplete(rowIndex) {
+        const input = document.querySelector(`.asset-search-input[data-row-index="${rowIndex}"]`);
+        const hidden = document.getElementById(`mu_asset_id_${rowIndex}`);
+        const list = document.getElementById(`mu_suggestions_${rowIndex}`);
         if (!input || !hidden || !list) return;
+
         function clear() { list.innerHTML = ''; list.style.display = 'none'; }
         function choose(btn) { hidden.value = btn.dataset.assetId; input.value = btn.dataset.label; clear(); }
+
         input.addEventListener('input', function() {
             const q = input.value.trim();
             hidden.value = '';
@@ -590,7 +708,7 @@
                         const label = `${p.category} — ${p.asset_id} — ${p.item_name}`;
                         el.textContent = `${p.category} • ${p.asset_id} • ${p.item_code || '-'} • ${p.item_name}`;
                         el.dataset.assetId = p.asset_id;
-                        el.dataset.label   = label;
+                        el.dataset.label = label;
                         el.addEventListener('click', () => choose(el));
                         list.appendChild(el);
                     });
@@ -598,16 +716,47 @@
                 })
                 .catch(() => clear());
         });
+
         document.addEventListener('click', function(e) {
             if (!list.contains(e.target) && e.target !== input) clear();
         });
-    })();
+    }
+
+    // Setup autocomplete for the initial row
+    document.addEventListener('DOMContentLoaded', function() {
+        setupAutocomplete(0);
+    });
+    </script>
+
+    <!-- ── JavaScript for Stage 1/2 Toggle ── -->
+    <script>
+    function showPurchaseSection(sectionType) {
+      // Hide both sections
+      document.getElementById('section_create').style.display = 'none';
+      document.getElementById('section_my_requests').style.display = 'none';
+      
+      // Reset button styles
+      document.getElementById('btn_create').className = 'au-btn-outline';
+      document.getElementById('btn_my_requests').className = 'au-btn-outline';
+      
+      // Show selected section and highlight button
+      document.getElementById('section_' + sectionType).style.display = 'block';
+      document.getElementById('btn_' + sectionType).className = 'au-btn-primary';
+    }
+
+    // Set default visibility for Stage 1/2 users
+    document.addEventListener('DOMContentLoaded', function() {
+      const userStage = "{{ user.stage }}";
+      if (userStage === "1" || userStage === "2") {
+        document.getElementById('section_my_requests').style.display = 'none';
+      }
+    });
     </script>
 
     <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
          FILTER + TABLE CARD
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-    <div class="au-card" style="animation: fadeUp .4s ease both; animation-delay:.12s;">
+    <div class="au-card" id="section_my_requests" style="animation: fadeUp .4s ease both; animation-delay:.12s;">
         <div class="au-card-head">
             <div class="au-card-head-title">
                 <i class="bi bi-funnel"></i> Filter Requests
@@ -617,17 +766,25 @@
         <div class="au-card-body" style="padding-bottom:.75rem;">
             <div class="filter-bar">
                 <div class="filter-bar-left">
-                    <form method="get" id="filterForm">
+                    <form method="get" id="filterForm" style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap;">
                         <div class="filter-group">
                             <label class="au-label">Category</label>
                             <select name="category" class="au-card-body" onchange="document.getElementById('filterForm').submit()"
-                                style="height:34px;width:200px;background:#fafbff;border:1px solid rgba(180,140,220,0.3);border-radius:7px;font-size:0.78rem;font-family:var(--font);color:#1e2035;padding:0 2rem 0 0.75rem;outline:none;-webkit-appearance:none;appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237c3aed' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 0.75rem center;cursor:pointer;">
+                                style="height:34px;width:200px;background:#fafbff;border:1px solid rgba(180,140,220,0.3);border-radius:7px;font-size:0.78rem;font-family:var(--font);color:#1e2035;padding:0 2rem 0 0.75rem;outline:none;-webkit-appearance:none;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237c3aed' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 0.75rem center;cursor:pointer;">
                                 <option value="">All categories</option>
                                 {% for c in categories %}
                                 <option value="{{ c.slug }}" {% if selected_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="filter-group">
+                            <label class="au-label">Search</label>
+                            <input type="text" name="search" placeholder="Request ID, Asset ID, Item Name..." value="{{ search|default:'' }}"
+                                style="height:34px;width:220px;background:#fafbff;border:1px solid rgba(180,140,220,0.3);border-radius:7px;font-size:0.78rem;font-family:var(--font);color:#1e2035;padding:0 0.75rem;outline:none;">
+                        </div>
+                        <button type="submit" class="status-btn" style="height:34px;margin-top:1.35rem;">
+                            <i class="bi bi-search"></i> Search
+                        </button>
                     </form>
                 </div>
                 <div>
@@ -661,6 +818,7 @@
                         <th>Requested</th>
                         <th>Received</th>
                         <th>Remaining</th>
+                        <th>Material Upload Form</th>
                         <th>Status</th>
                         <th>Requested By</th>
                         {% if can_fulfill %}<th>Actions</th>{% endif %}
@@ -684,6 +842,15 @@
                     <td><span class="qty-badge">{{ r.quantity_requested }}</span></td>
                     <td><span class="qty-badge">{{ r.quantity_received }}</span></td>
                     <td><span class="remain-badge">{{ r.remaining }}</span></td>
+                    <td>
+                        {% if r.material_upload_form %}
+                            <a href="{{ r.material_upload_form.url }}" class="au-btn-sm-outline">
+                                <i class="bi bi-file-earmark"></i> View
+                            </a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
                     <td>
                         {% if r.status == 'completed' %}
                         <span class="status-badge sb-completed"><span class="bdot"></span> Completed</span>
@@ -723,7 +890,7 @@
                         </div>
                         {% elif r.receipt_file %}
                         <a href="{% url 'inventory:management_upload_request_receipt' pk=r.pk %}"
-                           class="au-btn-sm-outline">
+                           class="au-btn-sm-outline" target="_blank">
                             <i class="bi bi-file-earmark-text"></i> View file
                         </a>
                         {% endif %}

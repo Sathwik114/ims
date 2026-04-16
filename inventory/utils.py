@@ -59,20 +59,20 @@ def send_issue_request_email(issue_request, email_type, request=None):
     
     Args:
         issue_request: IssueRequest instance
-        email_type: Type of email ('created', 'approved', 'rejected', 'issued')
+        email_type: Type of email ('created', 'approved', 'rejected', 'issued', 'confirmed')
         request: HttpRequest object (for generating links)
     """
     try:
+        if not issue_request.requested_by:
+            print("Skipping issue request email — no linked Django user for requester")
+            return False
         # Only send to users with company email addresses (@gti.nws.cn)
         if not issue_request.requested_by.email.endswith('@gti.nws.cn'):
             print(f"Skipping email - user {issue_request.requested_by.email} does not have company email address")
             return False
         
         # Generate the appropriate link based on user stage
-        if request:
-            base_url = f"{request.scheme}://{request.get_host()}"
-        else:
-            base_url = "http://10.40.20.4:8000"
+        base_url = "http://10.40.20.4:8000"
         
         # Stage 3 users (requesters) go to my-history page
         # Stage 1/2 users (approvers) can go to individual request page
@@ -126,6 +126,17 @@ def send_issue_request_email(issue_request, email_type, request=None):
                 'message': f'Your requested items have been issued by {issue_request.issued_by.get_full_name() or issue_request.issued_by.username}.',
                 'user_stage': 'stage3' if issue_request.requested_by.is_stage3() else 'admin'
             }
+            
+        elif email_type == 'confirmed':
+            to_email = issue_request.requested_by.email
+            subject = f"Item Request #{issue_request.request_id} Confirmed"
+            template_context = {
+                'issue_request': issue_request,
+                'link': link,
+                'status': 'confirmed',
+                'message': f'You have confirmed receipt of {issue_request.product.item_name}. The request is now complete.',
+                'user_stage': 'stage3' if issue_request.requested_by.is_stage3() else 'admin'
+            }
         else:
             return False
         
@@ -164,10 +175,7 @@ def send_low_stock_alert(product, request=None):
             return False
         
         # Generate link to product
-        if request:
-            link = f"{request.scheme}://{request.get_host()}/inventory/products/{product.id}/"
-        else:
-            link = f"http://10.40.20.4:8000/inventory/products/{product.id}/"
+        link = f"http://10.40.20.4:8000/items/"
         
         subject = f"Low Stock Alert: {product.item_name}"
         template_context = {

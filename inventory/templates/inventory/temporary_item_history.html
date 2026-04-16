@@ -1,0 +1,144 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Temporary Item History{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Temporary Item History</h5>
+
+    <!-- Toggle Buttons -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button class="btn btn-primary" id="btn_pending" onclick="showSection('pending')" style="flex:1;">
+                    Temp Item Pending ({{ pending_items|length }})
+                </button>
+                <button class="btn btn-outline-secondary" id="btn_returned" onclick="showSection('returned')" style="flex:1;">
+                    Temp Item Returned
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Temp Item Pending -->
+    <div class="card mb-3" id="section_pending">
+        <div class="card-body">
+            <h6 class="card-title">Temp Item Pending</h6>
+            <!-- Search Bar for Pending -->
+            <form method="get" class="d-flex gap-2 mb-3">
+                <input type="text" name="pending_q" class="form-control" placeholder="Search pending items by request ID, asset ID, item name, or username..." value="{{ pending_q }}">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a href="{% url 'inventory:temporary_item_history' %}" class="btn btn-outline-secondary">Clear</a>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Asset ID</th>
+                            <th>Item Name</th>
+                            <th>Issued To</th>
+                            <th>Quantity</th>
+                            <th>Issued By</th>
+                            <th>Issued At</th>
+                            <th>Reason</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pending_items %}
+                        <tr>
+                            <td>{{ item.request_id|default:"-" }}</td>
+                            <td>{{ item.product.asset_id }}</td>
+                            <td>{{ item.product.item_name }}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{% if item.issued_by %}{{ item.issued_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.issued_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{{ item.reason }}</td>
+                            <td>
+                                <form method="post" action="{% url 'inventory:return_temp_item' item.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-success">Return</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="9" class="text-muted">No pending temporary items.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Temp Item Returned -->
+    <div class="card" id="section_returned">
+        <div class="card-body">
+            <h6 class="card-title">Temp Item Returned</h6>
+            <!-- Search Bar for Returned -->
+            <form method="get" class="d-flex gap-2 mb-3">
+                <input type="text" name="returned_q" class="form-control" placeholder="Search returned items by request ID, asset ID, item name, or username..." value="{{ returned_q }}">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a href="{% url 'inventory:temporary_item_history' %}" class="btn btn-outline-secondary">Clear</a>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Asset ID</th>
+                            <th>Item Name</th>
+                            <th>Issued To</th>
+                            <th>Quantity</th>
+                            <th>Issued By</th>
+                            <th>Issued At</th>
+                            <th>Returned At</th>
+                            <th>Taken By</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in returned_items %}
+                        <tr>
+                            <td>{{ item.request_id|default:"-" }}</td>
+                            <td>{{ item.product.asset_id }}</td>
+                            <td>{{ item.product.item_name }}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{% if item.issued_by %}{{ item.issued_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.issued_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{{ item.returned_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{% if item.taken_by %}{{ item.taken_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.reason }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="10" class="text-muted">No returned temporary items.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toggle between sections
+function showSection(sectionType) {
+  // Hide both sections
+  document.getElementById('section_pending').style.display = 'none';
+  document.getElementById('section_returned').style.display = 'none';
+
+  // Reset button styles
+  document.getElementById('btn_pending').className = 'btn btn-outline-secondary';
+  document.getElementById('btn_returned').className = 'btn btn-outline-secondary';
+
+  // Show selected section and highlight button
+  document.getElementById('section_' + sectionType).style.display = 'block';
+  document.getElementById('btn_' + sectionType).className = 'btn btn-primary';
+}
+
+// Set default visibility
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('section_returned').style.display = 'none';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'inventory/base.html' %}
+{% block title %}User Stage History{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">User Stage History</h5>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User (ID)</th>
+                            <th>User Name</th>
+                            <th>Current Stage</th>
+                            <th>Updated Stage</th>
+                            <th>Updated By</th>
+                            <th>System IP</th>
+                            <th>Hostname</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in history %}
+                        <tr>
+                            <td class="text-muted small">{{ h.changed_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{{ h.user.username }}</td>
+                            <td>{{ h.user.full_name|default:"-" }}</td>
+                            <td>Stage {{ h.old_stage }}</td>
+                            <td>Stage {{ h.new_stage }}</td>
+                            <td>
+                                {% if h.changed_by %}
+                                    {{ h.changed_by.username }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ h.ip_address|default:"-" }}</td>
+                            <td>{{ h.hostname|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted">No stage changes recorded.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

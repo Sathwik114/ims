@@ -389,7 +389,7 @@ class Rack(models.Model):
 class Product(models.Model):
     """Inventory item. Linked to category and optionally to a rack."""
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
-    asset_id = models.CharField(max_length=100)
+    asset_id = models.CharField(max_length=100, blank=True)
     item_code = models.CharField(max_length=100, blank=True, default='')
     item_name = models.CharField(max_length=200)
     cabin_name = models.CharField(max_length=100, blank=True, default='')
@@ -411,6 +411,33 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.asset_id} - {self.item_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.asset_id:
+            self.asset_id = self.generate_next_asset_id()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def generate_next_asset_id(cls):
+        # Get all existing asset IDs that start with GTIIT
+        existing_ids = cls.objects.filter(asset_id__startswith='GTIIT').values_list('asset_id', flat=True)
+        
+        # Extract numbers from existing IDs
+        numbers = []
+        for asset_id in existing_ids:
+            if asset_id.startswith('GTIIT'):
+                try:
+                    num = int(asset_id[5:])  # Extract number after GTIIT
+                    numbers.append(num)
+                except ValueError:
+                    pass
+        
+        # Find the next available number
+        next_num = 1
+        if numbers:
+            next_num = max(numbers) + 1
+        
+        return f'GTIIT{next_num}'
 
     @property
     def is_low_stock(self):
@@ -446,7 +473,8 @@ class IssueRequest(models.Model):
     ]
     request_id = models.PositiveIntegerField(unique=True, null=True, blank=True, db_index=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='issue_requests')
-    requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='issue_requests_made')
+    requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='issue_requests_made', null=True, blank=True)
+    requested_by_username = models.CharField(max_length=100, blank=True, default='')
     requested_by_full_name = models.CharField(max_length=200, blank=True, default='')
     requested_by_mobile = models.CharField(max_length=30, blank=True, default='')
     requested_by_department = models.CharField(
@@ -475,6 +503,7 @@ class IssueRequest(models.Model):
         help_text='Printed brochure/application form linked to this request'
     )
     approved_quantity = models.PositiveIntegerField(null=True, blank=True)
+    needs_confirmation = models.BooleanField(default=False, help_text='Whether the user needs to confirm receipt of the item')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='issue_requests_approved')
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -564,6 +593,15 @@ class IssueRequest(models.Model):
             self.attachment = compress_django_file(self.attachment)
             
         super().save(*args, **kwargs)
+
+    @property
+    def requester_username_display(self) -> str:
+        """Login name for templates; avoids resolving username on a null requested_by FK."""
+        if self.requested_by_username:
+            return self.requested_by_username
+        if self.requested_by_id:
+            return self.requested_by.username
+        return '-'
 
 
 class PeripheralApplication(models.Model):
@@ -781,6 +819,7 @@ class ManagementUploadRequest(models.Model):
     quantity_received = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     notes = models.TextField(blank=True, default='')
+    material_upload_form = models.FileField(upload_to='material_upload_forms/', null=True, blank=True)
     receipt_file = models.FileField(upload_to='management_receipts/', null=True, blank=True)
     receipt_file_hash = models.CharField(max_length=64, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -803,5 +842,106 @@ class ManagementUploadRequest(models.Model):
         if self.receipt_file:
             from .utils import compress_django_file
             self.receipt_file = compress_django_file(self.receipt_file)
-            
+
         super().save(*args, **kwargs)
+
+
+class UserStageHistory(models.Model):
+    """Record of user stage changes."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stage_history')
+    old_stage = models.IntegerField(choices=STAGE_CHOICES)
+    new_stage = models.IntegerField(choices=STAGE_CHOICES)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='stage_changes_made')
+    changed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.CharField(max_length=64, blank=True, default='')
+    hostname = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f"{self.user.username}: Stage {self.old_stage} -> Stage {self.new_stage}"
+
+
+class TemporaryItemHistory(models.Model):
+    """Record of temporary item requests issued to users."""
+    request_id = models.CharField(max_length=20, unique=True, null=True, blank=True, db_index=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='temporary_history')
+    issued_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='temporary_items_received')
+    issued_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='temporary_items_issued')
+    taken_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='temporary_items_taken')
+    quantity = models.PositiveIntegerField()
+    issued_at = models.DateTimeField(auto_now_add=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[('issued', 'Issued'), ('returned', 'Returned')],
+        default='issued'
+    )
+    reason = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.issued_to.username if self.issued_to else 'N/A'} ({self.status})"
+
+
+class ReturnedItem(models.Model):
+    """Record of returned items."""
+    request_id = models.PositiveIntegerField(unique=True, null=True, blank=True, db_index=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='returned_items')
+    returned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='items_returned')
+    returned_by_section = models.CharField(
+        max_length=50,
+        choices=ADMIN_SECTION_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Section of user who returned the item'
+    )
+    returned_by_department = models.CharField(
+        max_length=20,
+        choices=DEPARTMENT_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Department of user who returned the item'
+    )
+    username = models.CharField(max_length=100, blank=True, default='')
+    full_name = models.CharField(max_length=200, blank=True, default='')
+    department = models.CharField(
+        max_length=20,
+        choices=DEPARTMENT_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Department of the user who is returning the item'
+    )
+    section = models.CharField(
+        max_length=50,
+        choices=ADMIN_SECTION_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Section of the user who is returning the item'
+    )
+    quantity = models.PositiveIntegerField()
+    taken_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='items_taken')
+    reason = models.TextField(blank=True, default='')
+    returned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-returned_at']
+
+    def save(self, *args, **kwargs):
+        if not self.request_id:
+            last = (
+                ReturnedItem.objects.exclude(request_id__isnull=True)
+                .order_by('-request_id')
+                .values_list('request_id', flat=True)
+                .first()
+            )
+            self.request_id = (last + 1) if last else 1000
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.username or self.full_name}"
+
+

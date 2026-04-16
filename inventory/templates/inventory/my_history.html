@@ -33,14 +33,35 @@
 <div class="container-fluid">
     <h5 class="mb-3" style="font-family: var(--font); font-weight:600; color: var(--text-900);">My History</h5>
 
-    <!-- My Issue Requests -->
+    <!-- Toggle Buttons -->
     <div class="card mb-3">
         <div class="card-body">
+            <div style="display:flex;gap:1rem;justify-content:center;">
+                <button class="btn btn-primary" id="btn_my_requests" onclick="showHistorySection('my_requests')" style="flex:1;">
+                    My item requests ({{ my_requests|length }})
+                </button>
+                <button class="btn btn-outline-secondary" id="btn_issued" onclick="showHistorySection('issued')" style="flex:1;">
+                    Issued to me ({{ my_issued|length }})
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- My Issue Requests -->
+    <div class="card mb-3" id="section_my_requests">
+        <div class="card-body">
             <h6 class="card-title">My issue requests</h6>
+            <form method="get" class="mb-3">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search_requests" class="form-control" placeholder="Search by Request ID, Asset ID, Item Name..." value="{{ search_requests|default:'' }}">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
+                            <th>Request ID</th>
                             <th>When</th>
                             <th>Item</th>
                             <th>Qty</th>
@@ -57,6 +78,7 @@
                             {% elif ir.status == 'rejected' %}row-rejected
                             {% endif %}
                         ">
+                            <td class="text-muted small">{{ ir.request_id|default:"-" }}</td>
                             <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
                             <td>{{ ir.product.asset_id }} — {{ ir.product.item_name }}</td>
                             <td>{{ ir.quantity }}</td>
@@ -76,7 +98,7 @@
                             <td class="text-muted small">{{ ir.rejection_reason|default:"-" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-muted">No requests.</td></tr>
+                        <tr><td colspan="6" class="text-muted">No requests.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -85,9 +107,15 @@
     </div>
 
     <!-- Issued to Me -->
-    <div class="card">
+    <div class="card" id="section_issued">
         <div class="card-body">
             <h6 class="card-title">Issued to me</h6>
+            <form method="get" class="mb-3">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search_issued" class="form-control" placeholder="Search by Asset ID, Item Name..." value="{{ search_issued|default:'' }}">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>
@@ -121,4 +149,26 @@
         </div>
     </div>
 </div>
+
+<script>
+// Toggle between sections
+function showHistorySection(sectionType) {
+  // Hide both sections
+  document.getElementById('section_my_requests').style.display = 'none';
+  document.getElementById('section_issued').style.display = 'none';
+  
+  // Reset button styles
+  document.getElementById('btn_my_requests').className = 'btn btn-outline-secondary';
+  document.getElementById('btn_issued').className = 'btn btn-outline-secondary';
+  
+  // Show selected section and highlight button
+  document.getElementById('section_' + sectionType).style.display = 'block';
+  document.getElementById('btn_' + sectionType).className = 'btn btn-primary';
+}
+
+// Set default visibility
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('section_issued').style.display = 'none';
+});
+</script>
 {% endblock %}

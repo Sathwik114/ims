@@ -44,10 +44,13 @@
                             <td>{{ u.email|default:"—" }}</td>
                             <td>
                                 <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editStageModal" onclick="setEditUser('{{ u.id }}', '{{ u.username }}', '{{ u.stage }}')">
+                                        <i class="bi bi-pencil"></i> Edit Stage
+                                    </button>
                                     <form method="post" action="{% url 'inventory:toggle_user_status' user_id=u.id %}" style="display: inline;">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-sm {% if u.is_active %}btn-warning{% else %}btn-success{% endif %}">
-                                            <i class="bi bi-{% if u.is_active %}pause{% else %}play{% endif %}"></i> 
+                                            <i class="bi bi-{% if u.is_active %}pause{% else %}play{% endif %}"></i>
                                             {% if u.is_active %}Disable{% else %}Enable{% endif %}
                                         </button>
                                     </form>
@@ -70,5 +73,54 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Stage Modal -->
+<div class="modal fade" id="editStageModal" tabindex="-1" aria-labelledby="editStageModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editStageModalLabel">Edit User Stage</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'inventory:edit_user_stage' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="user_id" id="edit_user_id">
+                    <div class="mb-3">
+                        <label for="edit_username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="edit_username" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_current_stage" class="form-label">Current Stage</label>
+                        <input type="text" class="form-control" id="edit_current_stage" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_new_stage" class="form-label">New Stage</label>
+                        <select class="form-select" id="edit_new_stage" name="new_stage" required>
+                            <option value="">Select Stage</option>
+                            <option value="1">Stage 1</option>
+                            <option value="2">Stage 2</option>
+                            <option value="3">Stage 3</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-warning" id="stage_change_warning" style="display: none;">
+                        <strong>Warning:</strong> Changing user stage will migrate their data accordingly.
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Stage</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setEditUser(userId, username, stage) {
+    document.getElementById('edit_user_id').value = userId;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_current_stage').value = 'Stage ' + stage;
+    document.getElementById('edit_new_stage').value = '';
+    document.getElementById('stage_change_warning').style.display = 'block';
+}
+</script>
 {% endblock %}
 

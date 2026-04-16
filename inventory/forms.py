@@ -43,7 +43,7 @@ class AddProductForm(forms.ModelForm):
         ]
         widgets = {
             'category': forms.Select(attrs={'class': 'form-control'}),
-            'asset_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'asset_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Auto-generated (GTIIT1, GTIIT2, ...)'}),
             'item_code': forms.TextInput(attrs={'class': 'form-control'}),
             'item_name': forms.TextInput(attrs={'class': 'form-control'}),
             'cabin_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Optional'}),
@@ -102,8 +102,8 @@ class IssueRequestForm(forms.Form):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Reason for this request'}),
     )
     attachment = forms.FileField(
-        required=True,
-        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'required': True})
+        required=False,
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'required': False})
     )
 
 
@@ -120,7 +120,7 @@ class OrderFulfillForm(forms.Form):
 
 
 class AddUserForm(forms.ModelForm):
-    stage = forms.ChoiceField(choices=[(1, 'Stage 1'), (2, 'Stage 2'), (3, 'Stage 3')], widget=forms.Select(attrs={'class': 'form-control'}))
+    stage = forms.ChoiceField(choices=[(1, 'Stage 1'), (2, 'Stage 2'), (3, 'Stage 3')], widget=forms.Select(attrs={'class': 'form-control'}), initial=3)
     mobile_number = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     full_name = forms.CharField(max_length=200, required=True, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter full name'}))
     department = forms.CharField(

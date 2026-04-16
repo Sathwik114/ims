@@ -1,0 +1,241 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Returned History{% endblock %}
+{% block content %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --ink:       #0f1117;
+    --ink-2:     #2b2f3a;
+    --ink-3:     #6b7280;
+    --surface:   #f8f9fb;
+    --card:      #ffffff;
+    --border:    #e4e7ed;
+    --accent:    #2563eb;
+    --accent-lt: #eff4ff;
+    --warn:      #d97706;
+    --warn-lt:   #fffbeb;
+    --ok:        #059669;
+    --ok-lt:     #ecfdf5;
+    --danger:    #dc2626;
+    --danger-lt: #fef2f2;
+    --info:      #0891b2;
+    --info-lt:   #ecfeff;
+    --radius:    10px;
+    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.07);
+  }
+
+  .rh-page {
+    font-family: 'Noto Sans', sans-serif;
+    color: var(--ink);
+    background: var(--surface);
+    min-height: 100vh;
+    padding: 2rem 1.25rem 3rem;
+  }
+
+  .rh-page-header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 2rem;
+  }
+
+  .rh-page-header h1 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .rh-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+  }
+
+  .rh-card-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: 1rem 1.25rem .85rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rh-card-header .card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .85rem;
+    flex-shrink: 0;
+  }
+
+  .icon-blue  { background: var(--accent-lt); color: var(--accent); }
+  .icon-warn  { background: var(--warn-lt);   color: var(--warn); }
+  .icon-green { background: var(--ok-lt);     color: var(--ok); }
+  .icon-info  { background: var(--info-lt);   color: var(--info); }
+
+  .rh-card-header h2 {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .rh-card-body {
+    padding: 1.25rem;
+  }
+
+  .table {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .85rem;
+  }
+
+  .table thead th {
+    background: var(--accent-lt);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: .75rem .5rem;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .table tbody td {
+    padding: .75rem .5rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .table tbody tr:hover {
+    background: var(--surface);
+  }
+
+  .btn-ir {
+    font-family: 'Noto Sans', sans-serif;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .5rem 1rem;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-3);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    background: var(--surface);
+    color: var(--ink);
+  }
+
+  .search-box {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1rem;
+  }
+
+  .search-box input {
+    flex: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    padding: .5rem .75rem;
+    font-size: .875rem;
+    background: var(--surface);
+    outline: none;
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent);
+  }
+</style>
+
+<div class="rh-page">
+
+  <div class="rh-page-header">
+    <span class="page-eyebrow">Inventory</span>
+    <h1>Returned History</h1>
+  </div>
+
+  <div class="rh-card">
+    <div class="rh-card-header">
+      <span class="card-icon icon-info">📋</span>
+      <h2>Returned Items History</h2>
+    </div>
+    <div class="rh-card-body">
+      <div class="search-box">
+        <form method="get" style="display:flex; gap:.5rem; flex:1;">
+          <input type="text" name="q" placeholder="Search by username, full name, asset ID, or item name..." value="{{ search_q }}">
+          <button type="submit" class="btn-ir btn-primary">Search</button>
+        </form>
+        <a href="{% url 'inventory:return_item' %}" class="btn-ir btn-primary" style="display:flex; align-items:center;">Return an Item</a>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Full Name</th>
+              <th>Department</th>
+              <th>Section</th>
+              <th>Asset ID</th>
+              <th>Item Name</th>
+              <th>Returned By</th>
+              <th>Quantity</th>
+              <th>Returned At</th>
+              <th>Taken By</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in returned_items %}
+            <tr>
+              <td>{{ item.username }}</td>
+              <td>{{ item.full_name }}</td>
+              <td>{{ item.get_department_display|default:item.department }}</td>
+              <td>{{ item.get_section_display|default:item.section }}</td>
+              <td>{{ item.product.asset_id }}</td>
+              <td>{{ item.product.item_name }}</td>
+              <td>{% if item.returned_by %}{{ item.returned_by.username }}{% else %}-{% endif %}</td>
+              <td>{{ item.quantity }}</td>
+              <td>{{ item.returned_at|date:"Y-m-d H:i" }}</td>
+              <td>{% if item.taken_by %}{{ item.taken_by.username }}{% else %}-{% endif %}</td>
+              <td>{{ item.reason|truncatewords:10 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="11" class="text-center" style="color:var(--ink-3); padding:2rem;">No returned items found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

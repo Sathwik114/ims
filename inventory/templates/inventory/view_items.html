@@ -339,7 +339,6 @@
 
     <!-- Filter row — auto search, no button -->
     <div class="vi-filters">
-        {% if not user.is_stage3 %}
         <span class="vi-filter-lbl">Category</span>
         <select id="vi-cat" onchange="viFilter()">
             <option value="">All</option>
@@ -348,7 +347,6 @@
             {% endfor %}
         </select>
         <div class="vi-filter-sep"></div>
-        {% endif %}
         <span class="vi-filter-lbl">Search</span>
         <input type="text" id="vi-q"
                placeholder="Asset ID / Item Code / Item Name"

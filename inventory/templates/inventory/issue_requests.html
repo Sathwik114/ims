@@ -384,10 +384,10 @@
     background: currentColor;
   }
 
-  .s-pending   { background: var(--warn-lt);   color: var(--warn); }
+  .s-pending   { background: #ffc107; color: #212529; }
   .s-approved  { background: var(--ok-lt);     color: var(--ok); }
   .s-issued    { background: var(--accent-lt); color: var(--accent); }
-  .s-confirmed { background: var(--info-lt);   color: var(--info); }
+  .s-confirmed { background: var(--ok-lt);     color: var(--ok); }
   .s-rejected  { background: var(--danger-lt); color: var(--danger); }
   .s-secondary { background: var(--surface);   color: var(--ink-3); border: 1px solid var(--border); }
 
@@ -457,7 +457,110 @@
   <div class="ir-page-header">
     <span class="page-eyebrow">Inventory</span>
     <h1>Issue Requests</h1>
+    {% if user.stage != 3 %}
+    <a href="?action=new_issue" class="btn-ir btn-primary" style="margin-left: auto;">
+      <i class="bi bi-plus"></i> New
+    </a>
+    {% endif %}
   </div>
+
+  <!-- ── New Issue Form (appears when action=new_issue) ── -->
+  {% if request.GET.action == 'new_issue' %}
+  <div class="ir-card blue-accent">
+    <div class="ir-card-header">
+      <span class="card-icon icon-blue">＋</span>
+      <h2>New Issue Request</h2>
+    </div>
+    <div class="ir-card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="new_issue">
+        <div class="req-form-grid" style="grid-template-columns: repeat(4, 1fr) auto; gap: .5rem;">
+          
+          <div class="form-field">
+            <label>Time</label>
+            <input type="text" id="current_time" readonly style="background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Department</label>
+            <input type="text" id="department" name="department" readonly style="background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Section</label>
+            <input type="text" id="section" name="section" readonly style="background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>User (username)</label>
+            <input type="text" id="username_input" autocomplete="off" placeholder="Enter username..." style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;background:var(--surface);">
+            <input type="hidden" name="username" id="selected_username" value="">
+          </div>
+          
+          <div class="form-field">
+            <label>Full Name</label>
+            <input type="text" id="full_name" name="full_name" readonly style="background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Mobile <span style="font-weight:400;color:var(--ink-3);">(optional)</span></label>
+            <input type="text" id="mobile" name="mobile" placeholder="Enter mobile number..." style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Item (search)</label>
+            <div class="search-wrap">
+              <input type="text" id="item_search" autocomplete="off" placeholder="Search item name..." style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;outline:none;width:100%;background:var(--surface);">
+              <div id="item_suggestions"></div>
+            </div>
+          </div>
+          
+          <div class="form-field">
+            <label>Item Code</label>
+            <input type="text" id="item_code" readonly style="background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Requested Qty</label>
+            <input type="number" name="quantity" min="1" required style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Attach File <span style="font-weight:400;color:var(--ink-3);">(optional)</span></label>
+            <input type="file" name="attachment" style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;background:var(--surface);">
+          </div>
+          
+          <div class="form-field">
+            <label>Reason</label>
+            <textarea name="reason" rows="1" required style="border:1.5px solid var(--border);border-radius:7px;padding:.5rem .75rem;font-size:.875rem;background:var(--surface);resize:vertical;"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label>Request Type (Required)</label>
+            <div style="display:flex;gap:0.5rem;">
+              <label style="display:flex;align-items:center;gap:0.25rem;cursor:pointer;">
+                <input type="radio" name="request_type" value="permanent" checked>
+                Permanent
+              </label>
+              <label style="display:flex;align-items:center;gap:0.25rem;cursor:pointer;">
+                <input type="radio" name="request_type" value="temporary">
+                Temporary
+              </label>
+            </div>
+          </div>
+          
+          <div class="submit-col" style="display:flex;gap:0.5rem;">
+            <button type="submit" class="btn-ir btn-primary" style="height:38px;">Save</button>
+            <a href="/issue-requests/" class="btn-ir btn-ghost" style="height:38px;">Cancel</a>
+          </div>
+        </div>
+        
+        <input type="hidden" name="product_asset_id" id="product_asset_id" value="">
+      </form>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- ── Request Form (stage 3 or user_can_request_issue) ── -->
   {% if user_can_request_issue and request.GET.action == 'new' or user.stage == 3 and not request.GET.action %}
@@ -507,13 +610,39 @@
   </div>
   {% endif %}
 
-  <!-- ── Pending Approvals ── -->
+  <!-- ── Stage 3 Toggle Buttons ── -->
+  {% if user.stage == 3 %}
+  <div class="ir-card" style="margin-bottom:1rem;">
+    <div class="ir-card-header" style="padding:1rem;">
+      <div style="display:flex;gap:1rem;justify-content:center;">
+        <button class="btn-ir btn-primary" id="btn_incomplete" onclick="showStage3Table('incomplete')" style="flex:1;padding:0.75rem 1.5rem;font-size:0.95rem;">My Incomplete Requests</button>
+        <button class="btn-ir btn-ghost" id="btn_confirmation" onclick="showStage3Table('confirmation')" style="flex:1;padding:0.75rem 1.5rem;font-size:0.95rem;">My Confirmation Pending</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Stage 1/2 Toggle Buttons ── -->
   {% if user_can_approve_issue_requests %}
-  <div class="ir-card warn-accent">
+  <div class="ir-card" style="margin-bottom:1rem;">
+    <div class="ir-card-header" style="padding:1rem;">
+      <div style="display:flex;gap:1rem;justify-content:center;">
+        <button class="btn-ir btn-primary" id="btn_pending" onclick="showTable('pending')" style="flex:1;padding:0.75rem 1.5rem;font-size:0.95rem;">Pending Approvals</button>
+        <button class="btn-ir btn-ghost" id="btn_approved" onclick="showTable('approved')" style="flex:1;padding:0.75rem 1.5rem;font-size:0.95rem;">Approval Awaiting to Issue</button>
+        <button class="btn-ir btn-ghost" id="btn_confirmed" onclick="showTable('confirmed')" style="flex:1;padding:0.75rem 1.5rem;font-size:0.95rem;">User Confirmation Pending</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pending Approvals Table ── -->
+  <div class="ir-card warn-accent" id="table_pending">
     <div class="ir-card-header">
       <span class="card-icon icon-warn">⏳</span>
       <h2>Pending Approvals</h2>
       <span class="badge-count">Stage 1 / 2</span>
+    </div>
+    <div style="padding:1rem;">
+      <input type="text" id="search_pending" placeholder="Search by username or item name..." style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);">
     </div>
     <div class="ir-table-wrap">
       <table class="ir-table">
@@ -543,8 +672,10 @@
               {% else %}-{% endif %}
             </td>
             <td>
-              <span class="cell-name">{{ ir.requested_by.username }}</span>
-              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+              <div style="display:flex;flex-direction:column;">
+                <span class="cell-name">{{ ir.requester_username_display }}</span>
+                {% if ir.requested_by_full_name %}<div class="cell-sub" style="margin-top:2px;">{{ ir.requested_by_full_name }}</div>{% endif %}
+              </div>
             </td>
             <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
             <td>
@@ -595,11 +726,14 @@
     {% endif %}
   </div>
 
-  <!-- ── Approved Requests ── -->
-  <div class="ir-card green-accent">
+  <!-- ── Approved Requests Table ── -->
+  <div class="ir-card green-accent" id="table_approved" style="display:none;">
     <div class="ir-card-header">
       <span class="card-icon icon-green">✓</span>
-      <h2>Approved — Awaiting Issue</h2>
+      <h2>Approval Awaiting to Issue</h2>
+    </div>
+    <div style="padding:1rem;">
+      <input type="text" id="search_approved" placeholder="Search by username or item name..." style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);">
     </div>
     <div class="ir-table-wrap">
       <table class="ir-table">
@@ -629,8 +763,10 @@
               {% else %}-{% endif %}
             </td>
             <td>
-              <span class="cell-name">{{ ir.requested_by.username }}</span>
-              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+              <div style="display:flex;flex-direction:column;">
+                <span class="cell-name">{{ ir.requester_username_display }}</span>
+                {% if ir.requested_by_full_name %}<div class="cell-sub" style="margin-top:2px;">{{ ir.requested_by_full_name }}</div>{% endif %}
+              </div>
             </td>
             <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
             <td>
@@ -686,7 +822,7 @@
 
   <!-- ── My Requests (stage 3) ── -->
   {% if user.stage == 3 %}
-  <div class="ir-card blue-accent">
+  <div class="ir-card blue-accent" style="display:none;">
     <div class="ir-card-header">
       <span class="card-icon icon-blue">📋</span>
       <h2>My Requests</h2>
@@ -709,6 +845,7 @@
         </thead>
         <tbody>
           {% for ir in my_requests %}
+          {% if ir.status != 'confirmed' %}
           <tr>
             <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
             <td>
@@ -727,7 +864,6 @@
                 {% if ir.status == 'pending' %}s-pending
                 {% elif ir.status == 'approved' %}s-approved
                 {% elif ir.status == 'issued' %}s-issued
-                {% elif ir.status == 'confirmed' %}s-confirmed
                 {% else %}s-rejected{% endif %}">
                 {{ ir.get_status_display }}
               </span>
@@ -753,15 +889,10 @@
               {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
             </td>
             <td>
-              {% if ir.status == 'issued' %}
-              <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}">{% csrf_token %}
-                <button class="btn-ir btn-success btn-sm" type="submit" onclick="return confirm('Confirm receipt of this item?')">Confirm receipt</button>
-              </form>
-              {% elif ir.status == 'confirmed' %}
-              <span class="status-badge s-confirmed">Confirmed</span>
-              {% else %}<span style="color:var(--ink-3);font-size:.75rem">—</span>{% endif %}
+              <span style="color:var(--ink-3);font-size:.75rem">—</span>
             </td>
           </tr>
+          {% endif %}
           {% empty %}
           <tr class="empty-row"><td colspan="10">You haven't made any requests yet.</td></tr>
           {% endfor %}
@@ -771,11 +902,14 @@
   </div>
   {% endif %}
 
-  <!-- ── User Confirmation Pending ── -->
-  <div class="ir-card info-accent">
+  <!-- ── User Confirmation Pending Table ── -->
+  <div class="ir-card info-accent" id="table_confirmed" style="display:none;">
     <div class="ir-card-header">
       <span class="card-icon icon-info">🔔</span>
       <h2>User Confirmation Pending</h2>
+    </div>
+    <div style="padding:1rem;">
+      <input type="text" id="search_confirmed" placeholder="Search by username or item name..." style="width:100%;padding:0.5rem;border:1px solid var(--border);border-radius:7px;background:var(--surface);">
     </div>
     <div class="ir-table-wrap">
       <table class="ir-table">
@@ -801,8 +935,10 @@
             <td class="cell-mono">{{ ir.product.asset_id }}</td>
             <td class="cell-name">{{ ir.product.item_name }}</td>
             <td>
-              <span class="cell-name">{{ ir.requested_by.username }}</span>
-              {% if ir.requested_by_full_name %}<div class="cell-sub">{{ ir.requested_by_full_name }}</div>{% endif %}
+              <div style="display:flex;flex-direction:column;">
+                <span class="cell-name">{{ ir.requester_username_display }}</span>
+                {% if ir.requested_by_full_name %}<div class="cell-sub" style="margin-top:2px;">{{ ir.requested_by_full_name }}</div>{% endif %}
+              </div>
             </td>
             <td class="cell-mono">{{ ir.requested_by_mobile|default:"-" }}</td>
             <td><span class="qty-chip">{{ ir.quantity }}</span></td>
@@ -823,7 +959,9 @@
               {% elif ir.status == 'approved' and ir.requested_by == request.user %}
                 <span class="status-badge s-approved">Awaiting Issue</span>
               {% elif ir.status == 'issued' and ir.requested_by == request.user %}
-                <span class="status-badge s-issued">Confirm Receipt</span>
+                <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}">{% csrf_token %}
+                  <button class="btn-ir btn-success btn-sm" type="submit" onclick="return confirm('Confirm receipt of this item?')">Confirm Receipt</button>
+                </form>
               {% elif ir.status == 'rejected' and ir.requested_by == request.user %}
                 <span class="status-badge s-rejected">Rejected</span>
               {% elif ir.status == 'confirmed' %}
@@ -857,58 +995,386 @@
     </div>
   </div>
 
+  <!-- ── Stage 3: My Incomplete Requests Table ── -->
+  {% if user.stage == 3 %}
+  <div class="ir-card warn-accent" id="table_incomplete" style="display:block;">
+    <div class="ir-card-header">
+      <span class="card-icon icon-warn">⏳</span>
+      <h2>My Incomplete Requests</h2>
+    </div>
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>Request ID</th>
+            <th>Time</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Status</th>
+            <th>Approved By</th>
+            <th>Issued By</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in my_requests %}
+          {% if ir.status == 'pending' or ir.status == 'approved' %}
+          <tr>
+            <td class="cell-mono">{{ ir.request_id }}</td>
+            <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
+            <td>
+              <span class="cell-name">{{ ir.product.item_name }}</span>
+              <div class="cell-sub cell-mono">{{ ir.product.asset_id }}</div>
+            </td>
+            <td><span class="qty-chip">{{ ir.quantity }}</td>
+            <td>
+              <span class="status-badge
+                {% if ir.status == 'pending' %}s-pending
+                {% elif ir.status == 'approved' %}s-approved
+                {% endif %}">
+                {{ ir.get_status_display }}
+              </span>
+            </td>
+            <td>
+              {% if ir.approved_by %}<span class="cell-name">{{ ir.approved_by.username }}</span>
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td>
+              {% if ir.issued_by %}<span class="cell-name">{{ ir.issued_by.username }}</span>
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td style="max-width:120px;font-size:.78rem;color:var(--ink-3);">{{ ir.request_reason|default:"—" }}</td>
+          </tr>
+          {% endif %}
+          {% empty %}
+          <tr class="empty-row"><td colspan="8">No incomplete requests.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Stage 3: My Confirmation Pending Table ── -->
+  <div class="ir-card info-accent" id="table_confirmation" style="display:none;">
+    <div class="ir-card-header">
+      <span class="card-icon icon-info">🔔</span>
+      <h2>My Confirmation Pending</h2>
+    </div>
+    <div class="ir-table-wrap">
+      <table class="ir-table">
+        <thead>
+          <tr>
+            <th>Request ID</th>
+            <th>Date / Time</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Approved By</th>
+            <th>Issued By</th>
+            <th>Reason</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ir in my_requests %}
+          {% if ir.status == 'issued' %}
+          <tr>
+            <td class="cell-mono">{{ ir.request_id }}</td>
+            <td class="cell-mono">{{ ir.created_at|date:"d M H:i" }}</td>
+            <td>
+              <span class="cell-name">{{ ir.product.item_name }}</span>
+              <div class="cell-sub cell-mono">{{ ir.product.asset_id }}</div>
+            </td>
+            <td><span class="qty-chip">{{ ir.quantity }}</td>
+            <td>
+              {% if ir.approved_by %}<span class="cell-name">{{ ir.approved_by.username }}</span>
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td>
+              {% if ir.issued_by %}<span class="cell-name">{{ ir.issued_by.username }}</span>
+              {% else %}<span style="color:var(--ink-3)">—</span>{% endif %}
+            </td>
+            <td style="max-width:120px;font-size:.78rem;color:var(--ink-3);">{{ ir.request_reason|default:"—" }}</td>
+            <td>
+              <form method="post" action="{% url 'inventory:issue_request_confirm' pk=ir.pk %}">{% csrf_token %}
+                <button class="btn-ir btn-success btn-sm" type="submit" onclick="return confirm('Confirm receipt of this item?')">Confirm Receipt</button>
+              </form>
+            </td>
+          </tr>
+          {% endif %}
+          {% empty %}
+          <tr class="empty-row"><td colspan="8">No confirmation pending items.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
 </div><!-- /.ir-page -->
 
 <script>
+// Toggle between tables for Stage 1/2 users
+function showTable(tableType) {
+  // Hide all tables
+  document.getElementById('table_pending').style.display = 'none';
+  document.getElementById('table_approved').style.display = 'none';
+  document.getElementById('table_confirmed').style.display = 'none';
+  
+  // Reset button styles
+  document.getElementById('btn_pending').className = 'btn-ir btn-ghost';
+  document.getElementById('btn_approved').className = 'btn-ir btn-ghost';
+  document.getElementById('btn_confirmed').className = 'btn-ir btn-ghost';
+  
+  // Show selected table and highlight button
+  document.getElementById('table_' + tableType).style.display = 'block';
+  document.getElementById('btn_' + tableType).className = 'btn-ir btn-primary';
+}
+
+// Toggle between tables for Stage 3 users
+function showStage3Table(tableType) {
+  // Hide all Stage 3 tables
+  document.getElementById('table_incomplete').style.display = 'none';
+  document.getElementById('table_confirmation').style.display = 'none';
+  
+  // Reset button styles
+  document.getElementById('btn_incomplete').className = 'btn-ir btn-ghost';
+  document.getElementById('btn_confirmation').className = 'btn-ir btn-ghost';
+  
+  // Show selected table and highlight button
+  document.getElementById('table_' + tableType).style.display = 'block';
+  document.getElementById('btn_' + tableType).className = 'btn-ir btn-primary';
+}
+
+// Toggle between tables for Stage 1/2 users
+function showStage12Table(tableType) {
+  // Hide all Stage 1/2 tables
+  document.getElementById('table_incomplete_12').style.display = 'none';
+  document.getElementById('table_confirmation_12').style.display = 'none';
+  
+  // Reset button styles
+  document.getElementById('btn_incomplete_12').className = 'btn-ir btn-ghost';
+  document.getElementById('btn_confirmation_12').className = 'btn-ir btn-ghost';
+  
+  // Show selected table and highlight button
+  document.getElementById('table_' + tableType + '_12').style.display = 'block';
+  document.getElementById('btn_' + tableType + '_12').className = 'btn-ir btn-primary';
+}
+
+// Filter table based on search input
+function filterTable(tableId, searchInputId) {
+  const table = document.querySelector('#' + tableId + ' table tbody');
+  const rows = table.querySelectorAll('tr');
+  const searchTerm = document.getElementById(searchInputId).value.toLowerCase();
+  
+  rows.forEach(row => {
+    const userCell = row.querySelector('td:nth-child(3)');
+    const itemCell = row.querySelector('td:nth-child(5)');
+    
+    if (userCell && itemCell) {
+      const userText = userCell.textContent.toLowerCase();
+      const itemText = itemCell.textContent.toLowerCase();
+      
+      if (userText.includes(searchTerm) || itemText.includes(searchTerm)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    }
+  });
+}
+
+// Add event listeners for search inputs
+document.addEventListener('DOMContentLoaded', function() {
+  const searchPending = document.getElementById('search_pending');
+  const searchApproved = document.getElementById('search_approved');
+  const searchConfirmed = document.getElementById('search_confirmed');
+  
+  if (searchPending) {
+    searchPending.addEventListener('input', function() {
+      filterTable('table_pending', 'search_pending');
+    });
+  }
+  
+  if (searchApproved) {
+    searchApproved.addEventListener('input', function() {
+      filterTable('table_approved', 'search_approved');
+    });
+  }
+  
+  if (searchConfirmed) {
+    searchConfirmed.addEventListener('input', function() {
+      filterTable('table_confirmed', 'search_confirmed');
+    });
+  }
+});
+
 (function () {
+  // Original request form script
   const input  = document.getElementById('req_search_input');
   const list   = document.getElementById('req_suggestions');
   const hidden = document.getElementById('req_asset_id');
   const btn    = document.getElementById('btn_request');
 
-  if (!input || !list) return;
+  if (input && list) {
+    function clearSuggestions() {
+      list.innerHTML = '';
+      list.style.display = 'none';
+    }
 
-  function clearSuggestions() {
-    list.innerHTML = '';
-    list.style.display = 'none';
+    function selectItem(el) {
+      hidden.value  = el.dataset.assetId;
+      input.value   = el.dataset.label;
+      btn.disabled  = false;
+      clearSuggestions();
+    }
+
+    input.addEventListener('input', function () {
+      const q = input.value.trim();
+      hidden.value = '';
+      btn.disabled = true;
+      if (!q) { clearSuggestions(); return; }
+
+      fetch("{% url 'inventory:search_products_api' %}?q=" + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(items => {
+          list.innerHTML = '';
+          if (!items.length) { clearSuggestions(); return; }
+          items.forEach(p => {
+            const el = document.createElement('button');
+            el.type = 'button';
+            const label = `${p.asset_id} — ${p.item_name}`;
+            el.textContent = `${p.asset_id}  ·  ${p.item_code || '—'}  ·  ${p.item_name}{% if not user.is_stage3 %}  (Avail: ${p.available}){% endif %}`;
+            el.dataset.assetId = p.asset_id;
+            el.dataset.label   = `${p.asset_id} — ${p.item_name}`;
+            el.addEventListener('click', () => selectItem(el));
+            list.appendChild(el);
+          });
+          list.style.display = 'block';
+        })
+        .catch(clearSuggestions);
+    });
+
+    document.addEventListener('click', e => {
+      if (!list.contains(e.target) && e.target !== input) clearSuggestions();
+    });
   }
 
-  function selectItem(el) {
-    hidden.value  = el.dataset.assetId;
-    input.value   = el.dataset.label;
-    btn.disabled  = false;
-    clearSuggestions();
+  // New issue form script
+  const usernameInput = document.getElementById('username_input');
+  const departmentInput = document.getElementById('department');
+  const sectionInput = document.getElementById('section');
+  const fullNameInput = document.getElementById('full_name');
+  const mobileInput = document.getElementById('mobile');
+  const itemSearch = document.getElementById('item_search');
+  const itemSuggestions = document.getElementById('item_suggestions');
+  const itemCodeInput = document.getElementById('item_code');
+  const productAssetIdInput = document.getElementById('product_asset_id');
+  const selectedUsernameInput = document.getElementById('selected_username');
+  const currentTimeInput = document.getElementById('current_time');
+
+  // Set current time
+  if (currentTimeInput) {
+    const now = new Date();
+    currentTimeInput.value = now.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
-  input.addEventListener('input', function () {
-    const q = input.value.trim();
-    hidden.value = '';
-    btn.disabled = true;
-    if (!q) { clearSuggestions(); return; }
+  // Username input auto-fetch from empmast/LDAP
+  if (usernameInput) {
+    let fetchTimeout;
+    usernameInput.addEventListener('input', function() {
+      const username = this.value.trim();
+      if (!username) {
+        departmentInput.value = '';
+        sectionInput.value = '';
+        fullNameInput.value = '';
+        selectedUsernameInput.value = '';
+        return;
+      }
+      // Always set the username field to the input value
+      selectedUsernameInput.value = username;
+      
+      clearTimeout(fetchTimeout);
+      fetchTimeout = setTimeout(() => {
+        departmentInput.value = 'Fetching...';
+        sectionInput.value = 'Fetching...';
+        fullNameInput.value = 'Fetching...';
+        fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.department) departmentInput.value = data.department;
+            else if (departmentInput.value === 'Fetching...') departmentInput.value = '';
+            if (data.section) sectionInput.value = data.section;
+            else if (sectionInput.value === 'Fetching...') sectionInput.value = '';
+            if (data.full_name) fullNameInput.value = data.full_name;
+            else if (fullNameInput.value === 'Fetching...') fullNameInput.value = '';
+            // Keep the username field set to the input value
+            selectedUsernameInput.value = username;
+          })
+          .catch(() => {
+            if (departmentInput.value === 'Fetching...') departmentInput.value = '';
+            if (sectionInput.value === 'Fetching...') sectionInput.value = '';
+            if (fullNameInput.value === 'Fetching...') fullNameInput.value = '';
+          });
+      }, 800);
+    });
+  }
 
-    fetch("{% url 'inventory:search_products_api' %}?q=" + encodeURIComponent(q))
-      .then(r => r.json())
-      .then(items => {
-        list.innerHTML = '';
-        if (!items.length) { clearSuggestions(); return; }
-        items.forEach(p => {
-          const el = document.createElement('button');
-          el.type = 'button';
-          const label = `${p.asset_id} — ${p.item_name}`;
-          el.textContent = `${p.asset_id}  ·  ${p.item_code || '—'}  ·  ${p.item_name}{% if not user.is_stage3 %}  (Avail: ${p.available}){% endif %}`;
-          el.dataset.assetId = p.asset_id;
-          el.dataset.label   = `${p.asset_id} — ${p.item_name}`;
-          el.addEventListener('click', () => selectItem(el));
-          list.appendChild(el);
-        });
-        list.style.display = 'block';
-      })
-      .catch(clearSuggestions);
-  });
+  // Item search auto-fetch from view items (same as Stage 3)
+  if (itemSearch && itemSuggestions) {
+    function clearItemSuggestions() {
+      itemSuggestions.innerHTML = '';
+      itemSuggestions.style.display = 'none';
+    }
 
-  document.addEventListener('click', e => {
-    if (!list.contains(e.target) && e.target !== input) clearSuggestions();
-  });
+    itemSearch.addEventListener('input', function() {
+      const q = itemSearch.value.trim();
+      if (q.length < 2) { clearItemSuggestions(); return; }
+
+      let fetchTimeout;
+      clearTimeout(fetchTimeout);
+      fetchTimeout = setTimeout(() => {
+        fetch(`/api/products/search-internal/?q=${encodeURIComponent(q)}`)
+          .then(r => r.json())
+          .then(items => {
+            itemSuggestions.innerHTML = '';
+            if (!items.length) { 
+              itemSuggestions.innerHTML = '<button type="button" style="width:100%;text-align:left;padding:.55rem .85rem;font-size:.8rem;background:none;border:none;border-bottom:1px solid var(--border);cursor:pointer;color:var(--ink-3);">No items found</button>';
+              itemSuggestions.style.display = 'block';
+              return;
+            }
+            items.forEach(p => {
+              const el = document.createElement('button');
+              el.type = 'button';
+              el.style.cssText = 'display:block;width:100%;text-align:left;padding:.55rem .85rem;font-size:.8rem;background:none;border:none;border-bottom:1px solid var(--border);cursor:pointer;color:var(--ink);transition:background .1s;';
+              el.innerHTML = `
+                <div style="font-weight:700;">${p.asset_id}</div>
+                <div style="font-size:.75rem;color:var(--ink-3);">${p.item_code} - ${p.item_name}</div>
+                <div style="font-size:.72rem;color:var(--ok);">Available: ${p.quantity_available}</div>
+              `;
+              el.addEventListener('click', function() {
+                itemSearch.value = `${p.asset_id} - ${p.item_name}`;
+                itemCodeInput.value = p.item_code || '';
+                productAssetIdInput.value = p.asset_id;
+                clearItemSuggestions();
+              });
+              el.addEventListener('mouseover', function() {
+                this.style.background = 'var(--accent-lt)';
+              });
+              el.addEventListener('mouseout', function() {
+                this.style.background = 'none';
+              });
+              itemSuggestions.appendChild(el);
+            });
+            itemSuggestions.style.display = 'block';
+          })
+          .catch(clearItemSuggestions);
+      }, 300);
+    });
+
+    document.addEventListener('click', e => {
+      if (!itemSuggestions.contains(e.target) && e.target !== itemSearch) clearItemSuggestions();
+    });
+  }
 })();
 </script>
 

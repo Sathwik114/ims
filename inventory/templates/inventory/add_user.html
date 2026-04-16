@@ -216,6 +216,19 @@
     }
     .au-note i { flex-shrink: 0; margin-top: 1px; color: #7c3aed; }
 
+    /* User row box styling */
+    .user-row {
+        background: #fafbff;
+        border: 2px solid rgba(124,58,237,0.2);
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+    .user-row:last-child {
+        margin-bottom: 0;
+    }
+
     @media (max-width: 540px) { .au-row { flex-direction: column; } }
 </style>
 {% endblock %}
@@ -253,70 +266,85 @@
         </div>
 
         <div class="au-card-body">
-            <form method="post">
+            <form method="post" id="multiUserForm">
                 {% csrf_token %}
 
-                <!-- ── Account Credentials row ── -->
-                <div class="au-sec">
-                    <div class="au-sec-icon"><i class="bi bi-key"></i></div>
-                    <span class="au-sec-label">Account Credentials</span>
-                    <div class="au-sec-rule"></div>
-                </div>
-                <div class="au-row">
-                    <div class="au-field">
-                        <label class="au-label">Username</label>
-                        {{ form.username }}
-                        {% if form.username.errors %}
-                        <div class="au-error">{{ form.username.errors.0 }}</div>
-                        {% endif %}
+                <!-- Users Container -->
+                <div id="usersContainer">
+                    <div class="user-row" data-row-index="0">
+                        <!-- ── Account Credentials row ── -->
+                        <div class="au-sec">
+                            <div class="au-sec-icon"><i class="bi bi-key"></i></div>
+                            <span class="au-sec-label">Account Credentials</span>
+                            <div class="au-sec-rule"></div>
+                        </div>
+                        <div class="au-row">
+                            <div class="au-field">
+                                <label class="au-label">Username</label>
+                                <input type="text" name="username_0" class="form-control username-input" placeholder="Enter username" required>
+                            </div>
+                        </div>
+
+                        <!-- ── Role row ── -->
+                        <div class="au-sec">
+                            <div class="au-sec-icon"><i class="bi bi-shield"></i></div>
+                            <span class="au-sec-label">Role</span>
+                            <div class="au-sec-rule"></div>
+                        </div>
+                        <div class="au-row">
+                            <div class="au-field">
+                                <label class="au-label">Stage</label>
+                                <select name="stage_0" class="form-control stage-select">
+                                    <option value="1">Stage 1</option>
+                                    <option value="2">Stage 2</option>
+                                    <option value="3" selected>Stage 3</option>
+                                </select>
+                            </div>
+                            <div class="au-field">
+                                <label class="au-label">Department</label>
+                                <input type="text" name="department_0" class="form-control department-input" readonly>
+                            </div>
+                            <div class="au-field">
+                                <label class="au-label">Section</label>
+                                <input type="text" name="section_0" class="form-control section-input" readonly>
+                            </div>
+                        </div>
+
+                        <!-- ── Personal Details row ── -->
+                        <div class="au-sec">
+                            <div class="au-sec-icon"><i class="bi bi-person"></i></div>
+                            <span class="au-sec-label">Personal Details</span>
+                            <div class="au-sec-rule"></div>
+                        </div>
+                        <div class="au-row">
+                            <div class="au-field">
+                                <label class="au-label">Full Name</label>
+                                <input type="text" name="full_name_0" class="form-control full-name-input" placeholder="Enter full name" required>
+                            </div>
+                            <div class="au-field">
+                                <label class="au-label">Email</label>
+                                <input type="email" name="email_0" class="form-control email-input" readonly>
+                            </div>
+                            <div class="au-field">
+                                <label class="au-label">Mobile Number</label>
+                                <input type="text" name="mobile_number_0" class="form-control mobile-input" placeholder="Enter mobile number">
+                            </div>
+                        </div>
+
+                        <!-- Remove Button -->
+                        <div style="margin-top: 0.5rem;">
+                            <button type="button" class="au-btn-cancel" onclick="removeUserRow(0)" style="display:none;" id="removeBtn_0">
+                                <i class="bi bi-trash"></i> Remove
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ── Role row ── -->
-                <div class="au-sec">
-                    <div class="au-sec-icon"><i class="bi bi-shield"></i></div>
-                    <span class="au-sec-label">Role</span>
-                    <div class="au-sec-rule"></div>
-                </div>
-                <div class="au-row">
-                    <div class="au-field">
-                        <label class="au-label">Stage</label>
-                        {{ form.stage }}
-                    </div>
-                    <div class="au-field">
-                        <label class="au-label">Department</label>
-                        {{ form.department }}
-                        <span class="au-hint-txt">Select department</span>
-                    </div>
-                    <div class="au-field">
-                        <label class="au-label">Section</label>
-                        {{ form.section }}
-                        <span class="au-hint-txt">Select section</span>
-                    </div>
-                </div>
-
-                <!-- ── Personal Details row ── -->
-                <div class="au-sec">
-                    <div class="au-sec-icon"><i class="bi bi-person"></i></div>
-                    <span class="au-sec-label">Personal Details</span>
-                    <div class="au-sec-rule"></div>
-                </div>
-                <div class="au-row">
-                    <div class="au-field">
-                        <label class="au-label">Full Name</label>
-                        {{ form.full_name }}
-                        {% if form.full_name.errors %}
-                        <div class="au-error">{{ form.full_name.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="au-field">
-                        <label class="au-label">Email</label>
-                        {{ form.email }}
-                    </div>
-                    <div class="au-field">
-                        <label class="au-label">Mobile Number</label>
-                        {{ form.mobile_number }}
-                    </div>
+                <!-- Add User Button -->
+                <div style="margin-top: 0.75rem;">
+                    <button type="button" class="au-btn-cancel" onclick="addUserRow()">
+                        <i class="bi bi-plus-circle"></i> Add User
+                    </button>
                 </div>
 
                 <div class="au-divider"></div>
@@ -324,7 +352,7 @@
                 <!-- Actions -->
                 <div class="au-actions">
                     <button type="submit" class="au-btn-submit">
-                        <i class="bi bi-person-check"></i> Create User
+                        <i class="bi bi-person-check"></i> Create Users
                     </button>
                     <a href="{% url 'inventory:profile' %}" class="au-btn-cancel">
                         <i class="bi bi-x"></i> Cancel
@@ -337,6 +365,7 @@
                         <strong>Stage 2</strong> users can manage inventory operations.
                         <strong>Stage 3</strong> users have request-only access.
                         Choose the correct role before creating.
+                        Default stage is Stage 3.
                     </span>
                 </div>
 
@@ -350,43 +379,140 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const usernameField   = document.getElementById('{{ form.username.id_for_label }}');
-        const emailField      = document.getElementById('{{ form.email.id_for_label }}');
-        const departmentField = document.getElementById('{{ form.department.id_for_label }}');
-        const sectionField    = document.getElementById('{{ form.section.id_for_label }}');
+let userRowCount = 1;
 
-        if (usernameField && emailField) {
-            usernameField.addEventListener('input', function () {
-                const username = this.value.trim();
-                emailField.value = username ? username + '@gti.nws.cn' : '';
-                fetchUserData(username);
+function addUserRow() {
+    const container = document.getElementById('usersContainer');
+    const newRow = document.createElement('div');
+    newRow.className = 'user-row';
+    newRow.setAttribute('data-row-index', userRowCount);
+    newRow.innerHTML = `
+        <div class="au-sec">
+            <div class="au-sec-icon"><i class="bi bi-key"></i></div>
+            <span class="au-sec-label">Account Credentials</span>
+            <div class="au-sec-rule"></div>
+        </div>
+        <div class="au-row">
+            <div class="au-field">
+                <label class="au-label">Username</label>
+                <input type="text" name="username_${userRowCount}" class="form-control username-input" placeholder="Enter username" required>
+            </div>
+        </div>
+        <div class="au-sec">
+            <div class="au-sec-icon"><i class="bi bi-shield"></i></div>
+            <span class="au-sec-label">Role</span>
+            <div class="au-sec-rule"></div>
+        </div>
+        <div class="au-row">
+            <div class="au-field">
+                <label class="au-label">Stage</label>
+                <select name="stage_${userRowCount}" class="form-control stage-select">
+                    <option value="1">Stage 1</option>
+                    <option value="2">Stage 2</option>
+                    <option value="3" selected>Stage 3</option>
+                </select>
+            </div>
+            <div class="au-field">
+                <label class="au-label">Department</label>
+                <input type="text" name="department_${userRowCount}" class="form-control department-input" readonly>
+            </div>
+            <div class="au-field">
+                <label class="au-label">Section</label>
+                <input type="text" name="section_${userRowCount}" class="form-control section-input" readonly>
+            </div>
+        </div>
+        <div class="au-sec">
+            <div class="au-sec-icon"><i class="bi bi-person"></i></div>
+            <span class="au-sec-label">Personal Details</span>
+            <div class="au-sec-rule"></div>
+        </div>
+        <div class="au-row">
+            <div class="au-field">
+                <label class="au-label">Full Name</label>
+                <input type="text" name="full_name_${userRowCount}" class="form-control full-name-input" placeholder="Enter full name" required>
+            </div>
+            <div class="au-field">
+                <label class="au-label">Email</label>
+                <input type="email" name="email_${userRowCount}" class="form-control email-input" readonly>
+            </div>
+            <div class="au-field">
+                <label class="au-label">Mobile Number</label>
+                <input type="text" name="mobile_number_${userRowCount}" class="form-control mobile-input" placeholder="Enter mobile number">
+            </div>
+        </div>
+        <div style="margin-top: 0.5rem;">
+            <button type="button" class="au-btn-cancel" onclick="removeUserRow(${userRowCount})">
+                <i class="bi bi-trash"></i> Remove
+            </button>
+        </div>
+    `;
+    container.appendChild(newRow);
+    setupUserRow(userRowCount);
+    userRowCount++;
+
+    // Show remove button for the first row
+    document.getElementById('removeBtn_0').style.display = 'inline-flex';
+}
+
+function removeUserRow(rowIndex) {
+    const row = document.querySelector(`.user-row[data-row-index="${rowIndex}"]`);
+    if (row) {
+        row.remove();
+    }
+
+    // Hide remove button for the first row if it's the only one left
+    const remainingRows = document.querySelectorAll('.user-row');
+    if (remainingRows.length === 1) {
+        const firstRow = remainingRows[0];
+        const firstRowIndex = firstRow.getAttribute('data-row-index');
+        const removeBtn = document.getElementById(`removeBtn_${firstRowIndex}`);
+        if (removeBtn) {
+            removeBtn.style.display = 'none';
+        }
+    }
+}
+
+function setupUserRow(rowIndex) {
+    const usernameField = document.querySelector(`input[name="username_${rowIndex}"]`);
+    const emailField = document.querySelector(`input[name="email_${rowIndex}"]`);
+    const departmentField = document.querySelector(`input[name="department_${rowIndex}"]`);
+    const sectionField = document.querySelector(`input[name="section_${rowIndex}"]`);
+    const fullNameField = document.querySelector(`input[name="full_name_${rowIndex}"]`);
+    const mobileField = document.querySelector(`input[name="mobile_number_${rowIndex}"]`);
+
+    if (usernameField && emailField) {
+        usernameField.addEventListener('input', function () {
+            const username = this.value.trim();
+            emailField.value = username ? username + '@gti.nws.cn' : '';
+            fetchUserData(username, departmentField, sectionField, fullNameField, mobileField);
+        });
+    }
+}
+
+let fetchTimeout;
+function fetchUserData(username, departmentField, sectionField, fullNameField, mobileField) {
+    if (!username) return;
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(() => {
+        if (departmentField) departmentField.value = 'Fetching...';
+        if (sectionField)    sectionField.value    = 'Fetching...';
+        fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.full_name     && fullNameField)  fullNameField.value  = data.full_name;
+                if (departmentField)   departmentField.value = data.department || '';
+                if (sectionField)      sectionField.value    = data.section    || '';
+                if (data.mobile_number && mobileField)   mobileField.value    = data.mobile_number;
+            })
+            .catch(() => {
+                if (departmentField && departmentField.value === 'Fetching...') departmentField.value = '';
+                if (sectionField    && sectionField.value    === 'Fetching...') sectionField.value    = '';
             });
-        }
+    }, 800);
+}
 
-        let fetchTimeout;
-        function fetchUserData(username) {
-            if (!username) return;
-            clearTimeout(fetchTimeout);
-            fetchTimeout = setTimeout(() => {
-                if (departmentField) departmentField.value = 'Fetching...';
-                if (sectionField)    sectionField.value    = 'Fetching...';
-                fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        const fullNameField = document.getElementById('{{ form.full_name.id_for_label }}');
-                        const mobileField   = document.getElementById('{{ form.mobile_number.id_for_label }}');
-                        if (data.full_name     && fullNameField)  fullNameField.value  = data.full_name;
-                        if (departmentField)   departmentField.value = data.department || '';
-                        if (sectionField)      sectionField.value    = data.section    || '';
-                        if (data.mobile_number && mobileField)   mobileField.value    = data.mobile_number;
-                    })
-                    .catch(() => {
-                        if (departmentField && departmentField.value === 'Fetching...') departmentField.value = '';
-                        if (sectionField    && sectionField.value    === 'Fetching...') sectionField.value    = '';
-                    });
-            }, 800);
-        }
-    });
+document.addEventListener('DOMContentLoaded', function () {
+    setupUserRow(0);
+});
 </script>
 {% endblock %}
