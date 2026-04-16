@@ -1,0 +1,58 @@
+{% extends 'inventory/base.html' %}
+{% block title %}Temporary Item History{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h5 class="mb-3">Temporary Item History</h5>
+
+    <!-- Temp Item Returned -->
+    <div class="card" id="section_returned">
+        <div class="card-body">
+            <h6 class="card-title">Temp Item Returned</h6>
+            <!-- Search Bar for Returned -->
+            <form method="get" class="d-flex gap-2 mb-3">
+                <input type="text" name="returned_q" class="form-control" placeholder="Search returned items by request ID, asset ID, item name, or username..." value="{{ returned_q }}">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a href="{% url 'inventory:temporary_item_history_returned' %}" class="btn btn-outline-secondary">Clear</a>
+            </form>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Asset ID</th>
+                            <th>Item Name</th>
+                            <th>Issued To</th>
+                            <th>Full Name</th>
+                            <th>Quantity</th>
+                            <th>Issued By</th>
+                            <th>Issued At</th>
+                            <th>Returned At</th>
+                            <th>Taken By</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in returned_items %}
+                        <tr>
+                            <td>{{ item.request_id|default:"-" }}</td>
+                            <td>{{ item.product.asset_id }}</td>
+                            <td>{{ item.product.item_name }}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% elif item.username %}{{ item.username }}{% else %}N/A{% endif %}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.full_name }}{% elif item.full_name %}{{ item.full_name }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{% if item.issued_by %}{{ item.issued_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.issued_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{{ item.returned_at|date:"Y-m-d H:i:s" }}</td>
+                            <td>{% if item.taken_by %}{{ item.taken_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ item.reason }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="10" class="text-muted">No returned temporary items.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

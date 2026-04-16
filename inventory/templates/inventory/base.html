@@ -337,6 +337,28 @@
             color: #ffaabb;
         }
 
+        /* Nested dropdown CSS */
+        .dropdown-submenu {
+            position: relative;
+        }
+
+        .dropdown-submenu .dropdown-menu {
+            top: 0;
+            left: 100%;
+            margin-top: -1px;
+            margin-left: -1px;
+            border-radius: 0 var(--radius) var(--radius) var(--radius);
+        }
+
+        .dropdown-submenu:hover .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown-submenu .dropdown-toggle::after {
+            margin-left: .5rem;
+            transform: rotate(-90deg);
+        }
+
         .nb-dropdown .dropdown-divider {
             border-color: rgba(120,80,200,0.22);
             margin: 0.3rem 0;
@@ -1048,26 +1070,28 @@
                 <i class="bi bi-arrow-left-right"></i> Item Requests <i class="bi bi-chevron-down"></i>
             </a>
             <ul class="dropdown-menu nb-dropdown">
+                <li><a class="dropdown-item" href="{% url 'inventory:raise_request' %}"><i
+                            class="bi bi-plus-circle"></i> Raise a Request</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:issue_requests' %}"><i
-                            class="bi bi-list-check"></i> Requests</a></li>
+                            class="bi bi-list-check"></i> Requests by User</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:management_upload_requests' %}"><i
                             class="bi bi-cloud-upload"></i> Purchase Requests</a></li>
-                <li><a class="dropdown-item" href="{% url 'inventory:item_requests_history' %}"><i
-                            class="bi bi-clock-history"></i> Issued History</a></li>
-                <li><a class="dropdown-item" href="{% url 'inventory:issued_overview' %}"><i
-                            class="bi bi-bar-chart"></i> Issued Overview</a></li>
-                <li><a class="dropdown-item" href="{% url 'inventory:temporary_item_history' %}"><i
-                            class="bi bi-clock"></i> Temp Item History</a></li>
                 <li>
                     <hr class="dropdown-divider">
                 </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">Temporary Items</li>
+                <li><a class="dropdown-item" href="{% url 'inventory:temporary_item_history' %}"><i
+                            class="bi bi-clock"></i> Manage Temporary Items</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">Return Item by User</li>
                 <li><a class="dropdown-item" href="{% url 'inventory:return_item' %}"><i
                             class="bi bi-arrow-return-left"></i> Return an Item</a></li>
-                <li><a class="dropdown-item" href="{% url 'inventory:returned_history' %}"><i
-                            class="bi bi-clock-history"></i> Returned History</a></li>
                 <li>
                     <hr class="dropdown-divider">
                 </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">You can request an item personally</li>
                 <li><a class="dropdown-item" href="{% url 'inventory:issue_requests_new' %}"><i
                             class="bi bi-plus-circle"></i> Request an Item</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:my_history' %}"><i
@@ -1093,14 +1117,32 @@
             <ul class="dropdown-menu nb-dropdown">
                 <li><a class="dropdown-item" href="{% url 'inventory:reports_logins' %}"><i class="bi bi-bar-chart"></i>
                         All Logins</a></li>
-                <li><a class="dropdown-item" href="{% url 'inventory:reports_transactions' %}"><i
-                            class="bi bi-receipt"></i> All Transactions</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:reports_updates' %}"><i
                             class="bi bi-pencil-square"></i> All Updates</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">Items</li>
+                <li><a class="dropdown-item" href="{% url 'inventory:reports_transactions' %}"><i
+                            class="bi bi-receipt"></i> Issued History</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:temporary_item_history_returned' %}"><i
+                            class="bi bi-clock"></i> Temporary Item History</a></li>
+                <li><a class="dropdown-item" href="{% url 'inventory:returned_history' %}"><i
+                            class="bi bi-clock-history"></i> Items Returned History</a></li>
                 <li><a class="dropdown-item" href="{% url 'inventory:reports_deleted_history' %}"><i
-                            class="bi bi-trash"></i> Deleted History</a></li>
+                            class="bi bi-trash"></i> Items Deleted History</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">Manage User</li>
                 <li><a class="dropdown-item" href="{% url 'inventory:user_stage_history' %}"><i
-                            class="bi bi-person-gear"></i> User Stage History</a></li>
+                            class="bi bi-person-gear"></i> User Stage Updated History</a></li>
+                <li>
+                    <hr class="dropdown-divider">
+                </li>
+                <li class="dropdown-header" style="font-size:0.6rem;font-weight:700;color:#f59e0b;letter-spacing:0.5px;text-transform:uppercase;">Overview</li>
+                <li><a class="dropdown-item" href="{% url 'inventory:issued_overview' %}"><i
+                            class="bi bi-bar-chart"></i> Issued Overview</a></li>
             </ul>
         </div>
         {% endif %}

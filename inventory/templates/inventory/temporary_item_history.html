@@ -36,6 +36,7 @@
                             <th>Asset ID</th>
                             <th>Item Name</th>
                             <th>Issued To</th>
+                            <th>Full Name</th>
                             <th>Quantity</th>
                             <th>Issued By</th>
                             <th>Issued At</th>
@@ -49,7 +50,8 @@
                             <td>{{ item.request_id|default:"-" }}</td>
                             <td>{{ item.product.asset_id }}</td>
                             <td>{{ item.product.item_name }}</td>
-                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% else %}N/A{% endif %}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% elif item.username %}{{ item.username }}{% else %}N/A{% endif %}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.full_name }}{% elif item.full_name %}{{ item.full_name }}{% else %}N/A{% endif %}</td>
                             <td>{{ item.quantity }}</td>
                             <td>{% if item.issued_by %}{{ item.issued_by.username }}{% else %}N/A{% endif %}</td>
                             <td>{{ item.issued_at|date:"Y-m-d H:i:s" }}</td>
@@ -88,6 +90,7 @@
                             <th>Asset ID</th>
                             <th>Item Name</th>
                             <th>Issued To</th>
+                            <th>Full Name</th>
                             <th>Quantity</th>
                             <th>Issued By</th>
                             <th>Issued At</th>
@@ -102,7 +105,8 @@
                             <td>{{ item.request_id|default:"-" }}</td>
                             <td>{{ item.product.asset_id }}</td>
                             <td>{{ item.product.item_name }}</td>
-                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% else %}N/A{% endif %}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.username }}{% elif item.username %}{{ item.username }}{% else %}N/A{% endif %}</td>
+                            <td>{% if item.issued_to %}{{ item.issued_to.full_name }}{% elif item.full_name %}{{ item.full_name }}{% else %}N/A{% endif %}</td>
                             <td>{{ item.quantity }}</td>
                             <td>{% if item.issued_by %}{{ item.issued_by.username }}{% else %}N/A{% endif %}</td>
                             <td>{{ item.issued_at|date:"Y-m-d H:i:s" }}</td>

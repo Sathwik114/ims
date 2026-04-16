@@ -870,6 +870,8 @@ class TemporaryItemHistory(models.Model):
     issued_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='temporary_items_received')
     issued_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='temporary_items_issued')
     taken_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='temporary_items_taken')
+    username = models.CharField(max_length=100, blank=True, default='', help_text='Username of the person the item is issued to')
+    full_name = models.CharField(max_length=200, blank=True, default='', help_text='Full name of the person the item is issued to')
     quantity = models.PositiveIntegerField()
     issued_at = models.DateTimeField(auto_now_add=True)
     returned_at = models.DateTimeField(null=True, blank=True)
@@ -884,7 +886,7 @@ class TemporaryItemHistory(models.Model):
         ordering = ['-issued_at']
 
     def __str__(self):
-        return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.issued_to.username if self.issued_to else 'N/A'} ({self.status})"
+        return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.issued_to.username if self.issued_to else self.username} ({self.status})"
 
 
 class ReturnedItem(models.Model):

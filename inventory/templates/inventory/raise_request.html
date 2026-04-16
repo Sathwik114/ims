@@ -1,0 +1,631 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block title %}Raise a Request{% endblock %}
+
+{% block extra_css %}
+<style>
+  * { box-sizing: border-box; }
+
+  .rr-page {
+    background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+    min-height: 100vh;
+    padding: 3rem 2rem;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .rr-page-header {
+    margin-bottom: 2.5rem;
+    animation: slideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .rr-page-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0.5rem 0 0 0;
+    letter-spacing: -0.5px;
+  }
+
+  .page-eyebrow {
+    display: inline-block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #7c3aed;
+    margin-bottom: 0.5rem;
+  }
+
+  .rr-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    animation: fadeInUp 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s backwards;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .rr-card-header {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    padding: 1.75rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    font-weight: 600;
+  }
+
+  .rr-card-header h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    letter-spacing: -0.3px;
+  }
+
+  .rr-card-body {
+    padding: 2.5rem;
+  }
+
+  /* Table-like form layout */
+  .request-table {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .form-field label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .form-field label .optional {
+    font-weight: 400;
+    color: #9ca3af;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .form-field input,
+  .form-field textarea,
+  .form-field select {
+    padding: 0.75rem 1rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    background-color: #fafbfc;
+  }
+
+  .form-field input:focus,
+  .form-field textarea:focus,
+  .form-field select:focus {
+    outline: none;
+    border-color: #7c3aed;
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  }
+
+  .form-field input[readonly],
+  .form-field input[type="file"] {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+  }
+
+  .form-field input[type="file"]::file-selector-button {
+    padding: 0.4rem 1rem;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-right: 0.75rem;
+    transition: background 0.2s;
+  }
+
+  .form-field input[type="file"]::file-selector-button:hover {
+    background: #6d28d9;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  /* Radio buttons */
+  .radio-group {
+    display: flex;
+    gap: 1.5rem;
+    padding-top: 0.2rem;
+  }
+
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #374151;
+  }
+
+  .radio-label input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #7c3aed;
+  }
+
+  /* Autocomplete suggestions */
+  .search-wrap {
+    position: relative;
+  }
+
+  #item_suggestions {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+
+  #item_suggestions button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.15s;
+  }
+
+  #item_suggestions button:last-child {
+    border-bottom: none;
+  }
+
+  #item_suggestions button:hover {
+    background: #f9fafb;
+  }
+
+  #item_suggestions button div:first-child {
+    font-weight: 700;
+    color: #1f2937;
+    font-size: 0.9rem;
+  }
+
+  #item_suggestions button div:nth-child(2) {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+  }
+
+  #item_suggestions button div:nth-child(3) {
+    font-size: 0.75rem;
+    color: #10b981;
+    margin-top: 0.15rem;
+    font-weight: 500;
+  }
+
+  /* Button section */
+  .button-section {
+    display: flex;
+    gap: 1rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 2rem;
+  }
+
+  .btn-ir {
+    padding: 0.85rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    letter-spacing: -0.3px;
+  }
+
+  .btn-ir.btn-primary {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+  }
+
+  .btn-ir.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  }
+
+  .btn-ir.btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .rr-page {
+      padding: 1.5rem 1rem;
+    }
+
+    .rr-card-body {
+      padding: 1.5rem;
+    }
+
+    .request-table {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .rr-page-header h1 {
+      font-size: 1.6rem;
+    }
+
+    .button-section {
+      flex-direction: column;
+    }
+
+    .btn-ir {
+      width: 100%;
+    }
+  }
+
+  /* Loading state for fetch */
+  .fetching {
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  /* Success indicator */
+  .field-success {
+    border-color: #10b981 !important;
+    background-color: #f0fdf4 !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rr-page">
+
+  <div class="rr-page-header">
+    <span class="page-eyebrow">📦 Inventory</span>
+    <h1>Raise a New Request</h1>
+  </div>
+
+  <div class="rr-card">
+    <div class="rr-card-header">
+      <span class="card-icon">+</span>
+      <h2>New Issue Request Form</h2>
+    </div>
+    <div class="rr-card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="new_issue">
+
+        <!-- Main request table -->
+        <div class="request-table">
+          
+          <!-- Row 1: Time, Department, Section, Username -->
+          <div class="form-field">
+            <label>⏰ Time</label>
+            <input type="text" id="current_time" readonly>
+          </div>
+          
+          <div class="form-field">
+            <label>🏢 Department</label>
+            <input type="text" id="department" name="department" readonly>
+          </div>
+          
+          <div class="form-field">
+            <label>📍 Section</label>
+            <input type="text" id="section" name="section" readonly>
+          </div>
+          
+          <div class="form-field">
+            <label>👤 User (Username)</label>
+            <input type="text" id="username_input" autocomplete="off" placeholder="Start typing...">
+            <input type="hidden" name="username" id="selected_username" value="">
+          </div>
+
+          <!-- Row 2: Full Name, Mobile -->
+          <div class="form-field">
+            <label>📋 Full Name</label>
+            <input type="text" id="full_name" name="full_name" readonly>
+          </div>
+          
+          <div class="form-field">
+            <label>📱 Mobile <span class="optional">(optional)</span></label>
+            <input type="text" id="mobile" name="mobile" placeholder="Enter number...">
+          </div>
+
+          <!-- Row 3: Item Search, Item Code -->
+          <div class="form-field">
+            <label>🔍 Item (Search)</label>
+            <div class="search-wrap">
+              <input type="text" id="item_search" autocomplete="off" placeholder="Search by name...">
+              <div id="item_suggestions"></div>
+            </div>
+          </div>
+          
+          <div class="form-field">
+            <label>🏷️ Item Code</label>
+            <input type="text" id="item_code" readonly>
+          </div>
+
+          <!-- Row 4: Quantity, File Attachment -->
+          <div class="form-field">
+            <label>📦 Requested Qty</label>
+            <input type="number" name="quantity" min="1" placeholder="Enter quantity..." required>
+          </div>
+          
+          <div class="form-field">
+            <label>📎 Attach File <span class="optional">(optional)</span></label>
+            <input type="file" name="attachment">
+          </div>
+
+          <!-- Row 5: Reason, Request Type -->
+          <div class="form-field">
+            <label>💬 Reason</label>
+            <textarea name="reason" required placeholder="Describe why this item is needed..."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label>⚙️ Request Type</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="request_type" value="permanent" checked>
+                Permanent
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="request_type" value="temporary">
+                Temporary
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Submit Button -->
+        <div class="button-section">
+          <button type="submit" class="btn-ir btn-primary">
+            ✓ Save Request
+          </button>
+        </div>
+
+        <input type="hidden" name="product_asset_id" id="product_asset_id" value="">
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Initialize form on page load
+document.addEventListener('DOMContentLoaded', function() {
+  initializeDepartmentAndSection();
+  initializeCurrentTime();
+  setupUsernameAutocomplete();
+  setupItemSearchAutocomplete();
+});
+
+// Set current time
+function initializeCurrentTime() {
+  const currentTimeInput = document.getElementById('current_time');
+  if (currentTimeInput) {
+    const now = new Date();
+    currentTimeInput.value = now.toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  }
+}
+
+// Set user's department and section
+function initializeDepartmentAndSection() {
+  const departmentInput = document.getElementById('department');
+  const sectionInput = document.getElementById('section');
+  const userDept = '{{ request.user.department|default:"" }}';
+  const userSect = '{{ request.user.section|default:"" }}';
+  
+  if (departmentInput && userDept) departmentInput.value = userDept;
+  if (sectionInput && userSect) sectionInput.value = userSect;
+}
+
+// Username autocomplete
+function setupUsernameAutocomplete() {
+  const usernameInput = document.getElementById('username_input');
+  const departmentInput = document.getElementById('department');
+  const sectionInput = document.getElementById('section');
+  const fullNameInput = document.getElementById('full_name');
+  const selectedUsernameInput = document.getElementById('selected_username');
+  const userDept = '{{ request.user.department|default:"" }}';
+  const userSect = '{{ request.user.section|default:"" }}';
+
+  if (!usernameInput) return;
+
+  let fetchTimeout;
+  usernameInput.addEventListener('input', function() {
+    const username = this.value.trim();
+    
+    if (!username) {
+      departmentInput.value = userDept;
+      sectionInput.value = userSect;
+      fullNameInput.value = '';
+      selectedUsernameInput.value = '';
+      return;
+    }
+
+    selectedUsernameInput.value = username;
+    clearTimeout(fetchTimeout);
+    
+    departmentInput.classList.add('fetching');
+    sectionInput.classList.add('fetching');
+    fullNameInput.classList.add('fetching');
+    departmentInput.value = 'Loading...';
+    sectionInput.value = 'Loading...';
+    fullNameInput.value = 'Loading...';
+
+    fetchTimeout = setTimeout(() => {
+      fetch(`/api/user-by-username/?username=${encodeURIComponent(username)}`)
+        .then(r => r.json())
+        .then(data => {
+          departmentInput.classList.remove('fetching');
+          sectionInput.classList.remove('fetching');
+          fullNameInput.classList.remove('fetching');
+          
+          departmentInput.value = data.department || userDept;
+          sectionInput.value = data.section || userSect;
+          fullNameInput.value = data.full_name || '';
+          
+          if (data.department) departmentInput.classList.add('field-success');
+          if (data.full_name) fullNameInput.classList.add('field-success');
+        })
+        .catch(() => {
+          departmentInput.classList.remove('fetching');
+          sectionInput.classList.remove('fetching');
+          fullNameInput.classList.remove('fetching');
+          departmentInput.value = userDept;
+          sectionInput.value = userSect;
+          fullNameInput.value = '';
+        });
+    }, 800);
+  });
+}
+
+// Item search autocomplete
+function setupItemSearchAutocomplete() {
+  const itemSearch = document.getElementById('item_search');
+  const itemSuggestions = document.getElementById('item_suggestions');
+  const itemCodeInput = document.getElementById('item_code');
+  const productAssetIdInput = document.getElementById('product_asset_id');
+
+  if (!itemSearch || !itemSuggestions) return;
+
+  function clearSuggestions() {
+    itemSuggestions.innerHTML = '';
+    itemSuggestions.style.display = 'none';
+  }
+
+  itemSearch.addEventListener('input', function() {
+    const q = itemSearch.value.trim();
+    if (q.length < 2) {
+      clearSuggestions();
+      return;
+    }
+
+    let fetchTimeout;
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(() => {
+      fetch(`/api/products/search-internal/?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(items => {
+          itemSuggestions.innerHTML = '';
+          
+          if (!items.length) {
+            const noResults = document.createElement('button');
+            noResults.type = 'button';
+            noResults.textContent = 'No items found';
+            noResults.style.cssText = 'padding:1rem;color:#6b7280;cursor:default;';
+            itemSuggestions.appendChild(noResults);
+            itemSuggestions.style.display = 'block';
+            return;
+          }
+
+          items.forEach(p => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.innerHTML = `
+              <div>${p.asset_id}</div>
+              <div>${p.item_code} — ${p.item_name}</div>
+              <div>✓ Available: ${p.quantity_available}</div>
+            `;
+            
+            button.addEventListener('click', (e) => {
+              e.preventDefault();
+              itemSearch.value = `${p.asset_id} - ${p.item_name}`;
+              itemCodeInput.value = p.item_code || '';
+              productAssetIdInput.value = p.asset_id;
+              clearSuggestions();
+            });
+            
+            itemSuggestions.appendChild(button);
+          });
+          
+          itemSuggestions.style.display = 'block';
+        })
+        .catch(() => {
+          itemSuggestions.innerHTML = '<button type="button" style="padding:1rem;color:#ef4444;">Error loading items</button>';
+          itemSuggestions.style.display = 'block';
+        });
+    }, 300);
+  });
+
+  // Close suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!itemSuggestions.contains(e.target) && e.target !== itemSearch) {
+      clearSuggestions();
+    }
+  });
+}
+</script>
+{% endblock %}

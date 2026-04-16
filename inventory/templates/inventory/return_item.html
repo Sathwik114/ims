@@ -51,6 +51,12 @@
     margin: 0;
   }
 
+  .ri-header-buttons {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .ri-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -176,6 +182,10 @@
   <div class="ri-page-header">
     <span class="page-eyebrow">Inventory</span>
     <h1>Return an Item</h1>
+    <div class="ri-header-buttons">
+      <a href="{% url 'inventory:return_item' %}" class="btn-ir btn-primary">Return an Item</a>
+      <a href="{% url 'inventory:returned_history' %}" class="btn-ir btn-ghost">Returned History</a>
+    </div>
   </div>
 
   <div class="ri-card blue-accent">

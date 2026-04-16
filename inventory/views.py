@@ -73,6 +73,44 @@ def _handle_compressed_upload(upload_file, upload_dir):
     return result['filename']
 
 
+def _normalize_category_slug(raw_category):
+    """Normalize legacy/spaced category values to canonical slugs."""
+    if raw_category is None:
+        return None
+    normalized = str(raw_category).strip().lower().replace('-', '_').replace(' ', '_')
+    aliases = {
+        'serverpart': 'server_parts',
+        'serverparts': 'server_parts',
+    }
+    normalized = aliases.get(normalized, normalized)
+    valid = {slug for slug, _ in CATEGORY_CHOICES}
+    return normalized if normalized in valid else raw_category
+
+
+def _create_issue_history_entry(*, product, issued_by, approved_by, receiver, receiver_full_name, receiver_mobile, quantity):
+    """Create a consistent IssueHistory record for issued items."""
+    qty = int(quantity or 0)
+    if qty <= 0:
+        return None
+    unit_price = _as_decimal(product.price)
+    total_cost = unit_price * Decimal(qty) if unit_price is not None else None
+    return IssueHistory.objects.create(
+        product=product,
+        issued_by=issued_by,
+        issued_by_section=(issued_by.section if issued_by else ''),
+        issued_by_department=(issued_by.department if issued_by else ''),
+        approved_by=approved_by,
+        approved_by_section=(approved_by.section if approved_by else ''),
+        approved_by_department=(approved_by.department if approved_by else ''),
+        receiver=receiver,
+        receiver_full_name=receiver_full_name or '',
+        receiver_mobile=receiver_mobile or '',
+        quantity=qty,
+        unit_price=unit_price,
+        total_cost=total_cost,
+    )
+
+
 def get_client_ip(request):
     """
     Get the real client IP address and system information.
@@ -355,17 +393,22 @@ def dashboard(request):
         type_counts[cat] = Product.objects.filter(category=cat).count()
 
     # Issued-by-category overview for dashboard bar chart (which category issued more)
-    issued_by_category = (
+    issued_by_category_rows = (
         IssueHistory.objects.values('product__category')
         .annotate(total_qty=Sum('quantity'))
-        .order_by('-total_qty')
     )
+    issued_totals_by_category = {cat: 0 for cat in categories}
+    for row in issued_by_category_rows:
+        normalized_category = _normalize_category_slug(row['product__category'])
+        issued_totals_by_category[normalized_category] = (
+            issued_totals_by_category.get(normalized_category, 0) + (row['total_qty'] or 0)
+        )
     issued_by_category_series = [
         {
-            'label': label_map.get(row['product__category'], row['product__category']),
-            'value': row['total_qty'] or 0,
+            'label': label_map.get(category, category),
+            'value': total_qty,
         }
-        for row in issued_by_category
+        for category, total_qty in sorted(issued_totals_by_category.items(), key=lambda item: item[1], reverse=True)
     ]
 
     show_right = True  # Show right panel for all users
@@ -512,7 +555,15 @@ def view_items(request):
     q = request.GET.get('q', '').strip()
     qs = Product.objects.all()
     if category:
-        qs = qs.filter(category=category)
+        # Filter by category slug or name (case-insensitive) with all possible variations
+        normalized_category = _normalize_category_slug(category)
+        label_map = dict(CATEGORY_CHOICES)
+        category_name = label_map.get(category, category)
+        # For server parts, try all possible variations
+        if category.lower() in ['server_parts', 'server parts']:
+            qs = qs.filter(Q(category__iexact='server_parts') | Q(category__iexact='Server Parts') | Q(category__iexact='serverparts') | Q(category__iexact='ServerParts') | Q(category__iexact='serverpart') | Q(category__iexact='ServerPart'))
+        else:
+            qs = qs.filter(Q(category__iexact=normalized_category) | Q(category__iexact=category_name))
     if q:
         qs = qs.filter(Q(asset_id__icontains=q) | Q(item_code__icontains=q) | Q(item_name__icontains=q))
 
@@ -715,7 +766,15 @@ def view_items_excel(request):
     q = request.GET.get('q', '').strip()
     qs = Product.objects.select_related('rack').all().order_by('category', 'asset_id')
     if category:
-        qs = qs.filter(category=category)
+        # Filter by category slug or name (case-insensitive) with all possible variations
+        normalized_category = _normalize_category_slug(category)
+        label_map = dict(CATEGORY_CHOICES)
+        category_name = label_map.get(category, category)
+        # For server parts, try all possible variations
+        if category.lower() in ['server_parts', 'server parts']:
+            qs = qs.filter(Q(category__iexact='server_parts') | Q(category__iexact='Server Parts') | Q(category__iexact='serverparts') | Q(category__iexact='ServerParts') | Q(category__iexact='serverpart') | Q(category__iexact='ServerPart'))
+        else:
+            qs = qs.filter(Q(category__iexact=normalized_category) | Q(category__iexact=category_name))
     if q:
         qs = qs.filter(Q(asset_id__icontains=q) | Q(item_code__icontains=q) | Q(item_name__icontains=q))
 
@@ -1209,6 +1268,17 @@ def issue_requests(request):
         if request_type == 'temporary':
             from .models import TemporaryItemHistory
 
+            # Fetch full_name from empmast if user doesn't exist in Django
+            if issued_to_user:
+                temp_full_name = issued_to_user.full_name or issued_to_user.get_full_name() or issued_to_user.username
+            else:
+                from .models import get_employee_data_from_mssql
+                mssql_data = get_employee_data_from_mssql(username)
+                if mssql_data:
+                    temp_full_name = mssql_data.get('full_name', full_name or username)
+                else:
+                    temp_full_name = full_name or username
+
             # Auto-generate request_id with 'Temp' prefix
             # Get all request_ids that start with 'Temp' and extract the numeric part
             existing_ids = TemporaryItemHistory.objects.filter(
@@ -1234,6 +1304,8 @@ def issue_requests(request):
                 product=product,
                 issued_to=issued_to_user,
                 issued_by=request.user,
+                username=username,
+                full_name=temp_full_name,
                 quantity=int(quantity),
                 reason=reason,
                 status='issued'
@@ -1487,6 +1559,35 @@ def temporary_item_history(request):
         'pending_items': pending_items,
         'returned_items': returned_items,
         'pending_q': pending_q,
+        'returned_q': returned_q,
+    })
+
+
+@login_required
+def temporary_item_history_returned(request):
+    """Display only returned temporary items for History dropdown."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can view temporary item history.')
+        return redirect('inventory:dashboard')
+
+    from .models import TemporaryItemHistory
+
+    returned_q = request.GET.get('returned_q', '').strip()
+
+    # Base query for returned items only
+    returned_items = TemporaryItemHistory.objects.filter(status='returned').select_related('product', 'issued_to', 'issued_by', 'taken_by')
+
+    # Apply search filter for returned items
+    if returned_q:
+        returned_items = returned_items.filter(
+            Q(request_id__icontains=returned_q) |
+            Q(product__asset_id__icontains=returned_q) |
+            Q(product__item_name__icontains=returned_q) |
+            Q(issued_to__username__icontains=returned_q)
+        )
+
+    return render(request, 'inventory/temporary_item_history_returned.html', {
+        'returned_items': returned_items,
         'returned_q': returned_q,
     })
 
@@ -1801,6 +1902,11 @@ def issue_request_issue(request, pk):
         ir.needs_confirmation = True
         ir.status = IssueRequest.STATUS_ISSUED
         ir.save()
+        
+        # Decrement product quantity when marked as issued
+        ir.product.quantity_available -= ir.approved_quantity if ir.approved_quantity else ir.quantity
+        ir.product.save()
+        
         # Send email notification for issued status
         send_issue_request_email(ir, 'issued', request)
         messages.success(request, 'Marked as issued. Confirmation request sent to user.')
@@ -1932,6 +2038,7 @@ def return_item(request):
             department=user_department,
             section=user_section,
             quantity=int(quantity),
+            taken_by=request.user,
             reason=reason,
         )
 
@@ -1943,6 +2050,225 @@ def return_item(request):
         return redirect('inventory:returned_history')
 
     return render(request, 'inventory/return_item.html')
+
+
+@login_required
+def raise_request(request):
+    """Raise a Request - duplicate of new issue form on a separate page."""
+    if not request.user.can_approve_issue_requests():
+        messages.error(request, 'Only Stage 1/2 users can raise requests.')
+        return redirect('inventory:dashboard')
+
+    raw_category = request.GET.get('category', '').strip()
+    search_q = request.GET.get('q', '').strip()
+    
+    # Use category for Stage 1/2 users
+    category = raw_category or 'networking'
+    products_qs = Product.objects.filter(category=category).order_by('asset_id')
+    
+    # Search by asset / code / name
+    if search_q:
+        products_qs = products_qs.filter(
+            Q(asset_id__icontains=search_q) |
+            Q(item_code__icontains=search_q) |
+            Q(item_name__icontains=search_q)
+        )
+    
+    products = products_qs
+    
+    # Handle new_issue form submission
+    if request.method == 'POST' and request.POST.get('action') == 'new_issue':
+        username = request.POST.get('username')
+        product_asset_id = request.POST.get('product_asset_id')
+        quantity = request.POST.get('quantity')
+        reason = request.POST.get('reason')
+        mobile = request.POST.get('mobile', '').strip()
+        department = request.POST.get('department', '').strip()
+        section = request.POST.get('section', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        attachment = request.FILES.get('attachment')
+        request_type = request.POST.get('request_type', 'permanent')
+
+        if not username:
+            messages.error(request, 'Username is required.')
+            return redirect('inventory:raise_request')
+        if not product_asset_id:
+            messages.error(request, 'Please select an item from the search results.')
+            return redirect('inventory:raise_request')
+        if not quantity:
+            messages.error(request, 'Quantity is required.')
+            return redirect('inventory:raise_request')
+        if not reason:
+            messages.error(request, 'Reason is required.')
+            return redirect('inventory:raise_request')
+
+        product = get_object_or_404(Product, asset_id=product_asset_id)
+
+        if product.quantity_available < int(quantity):
+            messages.error(request, 'Insufficient quantity.')
+            return redirect('inventory:raise_request')
+
+        # Try to get user from Django, if not found, use empmast data
+        try:
+            selected_user = User.objects.get(username=username)
+            issued_to_user = selected_user
+        except User.DoesNotExist:
+            issued_to_user = None
+
+        # Handle file upload with compression
+        attachment_filename = _handle_compressed_upload(attachment, 'issue_request_files') if attachment else None
+
+        # Ensure proper path for Django FileField
+        if attachment_filename and not attachment_filename.startswith('issue_request_files/'):
+            attachment_path = f'issue_request_files/{attachment_filename}'
+        else:
+            attachment_path = attachment_filename
+
+        # Route to TemporaryItemHistory if request type is temporary
+        if request_type == 'temporary':
+            from .models import TemporaryItemHistory
+
+            # Fetch full_name from empmast if user doesn't exist in Django
+            if issued_to_user:
+                temp_full_name = issued_to_user.full_name or issued_to_user.get_full_name() or issued_to_user.username
+            else:
+                from .models import get_employee_data_from_mssql
+                mssql_data = get_employee_data_from_mssql(username)
+                if mssql_data:
+                    temp_full_name = mssql_data.get('full_name', full_name or username)
+                else:
+                    temp_full_name = full_name or username
+
+            # Auto-generate request_id with 'Temp' prefix
+            existing_ids = TemporaryItemHistory.objects.filter(
+                request_id__startswith='Temp'
+            ).values_list('request_id', flat=True)
+
+            numeric_parts = []
+            for rid in existing_ids:
+                if rid and rid.startswith('Temp'):
+                    try:
+                        num = int(rid[4:])
+                        numeric_parts.append(num)
+                    except ValueError:
+                        pass
+
+            max_num = max(numeric_parts) if numeric_parts else 0
+            new_request_id = f'Temp{max_num + 1}' if max_num >= 1000 else 'Temp1000'
+
+            TemporaryItemHistory.objects.create(
+                request_id=new_request_id,
+                product=product,
+                issued_to=issued_to_user,
+                issued_by=request.user,
+                username=username,
+                full_name=temp_full_name,
+                quantity=int(quantity),
+                reason=reason,
+                status='issued'
+            )
+
+            # Update product quantity
+            product.quantity_available -= int(quantity)
+            product.save()
+
+            messages.success(request, 'Temporary item issued successfully.')
+            return redirect('inventory:raise_request')
+
+        # For permanent requests, continue with existing IssueRequest logic
+        try:
+            selected_user = User.objects.get(username=username)
+            user_full_name = selected_user.full_name or selected_user.get_full_name() or selected_user.username
+            user_mobile = mobile or selected_user.mobile_number or ''
+            user_department = department or selected_user.department
+            user_section = section or selected_user.section
+            confirmed_by_user = selected_user
+        except User.DoesNotExist:
+            # User doesn't exist in Django, use empmast data or form data
+            from .models import get_employee_data_from_mssql
+            mssql_data = get_employee_data_from_mssql(username)
+            if mssql_data:
+                user_full_name = mssql_data.get('full_name', full_name or username)
+                user_mobile = mobile or mssql_data.get('mobile_number', '')
+                user_department = department or mssql_data.get('department', '')
+                user_section = section or mssql_data.get('section', '')
+            else:
+                user_full_name = full_name or username
+                user_mobile = mobile or ''
+                user_department = department or ''
+                user_section = section or ''
+            confirmed_by_user = None  # No Django user to confirm
+
+        # Create issue request with status based on user existence
+        if confirmed_by_user:
+            # User exists in Django - needs confirmation
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=confirmed_by_user,
+                requested_by_username=username,
+                requested_by_full_name=user_full_name,
+                requested_by_mobile=user_mobile,
+                requested_by_department=user_department,
+                requested_by_section=user_section,
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_ISSUED,
+                needs_confirmation=True,
+                # Auto-populate approved and issued fields
+                approved_by=request.user,
+                approved_by_department=request.user.department,
+                approved_by_section=request.user.section,
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_section=request.user.section,
+                issued_by_department=request.user.department,
+                issued_at=timezone.now(),
+                approved_quantity=int(quantity),
+            )
+            _notify_issue_request_created(ir, request)
+            messages.success(request, 'Request submitted and auto-issued. Waiting for user confirmation.')
+        else:
+            # User doesn't exist in Django - auto-confirm
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=request.user,  # Use admin as requester
+                requested_by_username=username,
+                requested_by_full_name=user_full_name,
+                requested_by_mobile=user_mobile,
+                requested_by_department=user_department,
+                requested_by_section=user_section,
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_CONFIRMED,
+                needs_confirmation=False,
+                # Auto-populate approved, issued, and confirmed fields
+                approved_by=request.user,
+                approved_by_department=request.user.department,
+                approved_by_section=request.user.section,
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_section=request.user.section,
+                issued_by_department=request.user.department,
+                issued_at=timezone.now(),
+                approved_quantity=int(quantity),
+                confirmed_by=request.user,
+                confirmed_by_section=request.user.section,
+                confirmed_by_department=request.user.department,
+                confirmed_at=timezone.now(),
+            )
+            _notify_issue_request_created(ir, request)
+            messages.success(request, 'Request submitted and auto-confirmed. Issue completed.')
+
+        return redirect('inventory:raise_request')
+
+    return render(request, 'inventory/raise_request.html', {
+        'category': category,
+        'category_name': dict(CATEGORY_CHOICES).get(category, category),
+        'products': products,
+        'search_q': search_q,
+    })
 
 
 @login_required
@@ -2382,30 +2708,70 @@ def issued_overview(request):
 
     label_map = dict(CATEGORY_CHOICES)
 
-    # Totals by category (for line chart + table)
+    # Get date filters
+    from_date = request.GET.get('from_date', '').strip()
+    to_date = request.GET.get('to_date', '').strip()
+
+    # Base query with date filtering
+    base_qs = IssueHistory.objects.all()
+    if from_date:
+        base_qs = base_qs.filter(issued_at__gte=from_date)
+    if to_date:
+        base_qs = base_qs.filter(issued_at__lte=to_date)
+
+    # Totals by category (for line chart + table) with amount calculation
     by_category_rows = (
-        IssueHistory.objects.values('product__category')
+        base_qs.values('product__category')
         .annotate(total_qty=Sum('quantity'))
-        .order_by('-total_qty')
     )
-    by_category = [
-        {
-            'slug': row['product__category'],
-            'name': label_map.get(row['product__category'], row['product__category']),
-            'total': row['total_qty'] or 0,
+    categories = [c[0] for c in CATEGORY_CHOICES]
+    by_category_map = {
+        cat: {
+            'slug': cat,
+            'name': label_map.get(cat, cat),
+            'total': 0,
+            'total_amount': 0,
         }
-        for row in by_category_rows
-    ]
+        for cat in categories
+    }
+    for row in by_category_rows:
+        normalized_category = _normalize_category_slug(row['product__category'])
+        entry = by_category_map.setdefault(normalized_category, {
+            'slug': normalized_category,
+            'name': label_map.get(normalized_category, normalized_category),
+            'total': 0,
+            'total_amount': 0,
+        })
+        entry['total'] += row['total_qty'] or 0
+
+    amount_rows = base_qs.values('product__category', 'quantity', 'product__price')
+    for row in amount_rows:
+        normalized_category = _normalize_category_slug(row['product__category'])
+        if normalized_category not in by_category_map:
+            by_category_map[normalized_category] = {
+                'slug': normalized_category,
+                'name': label_map.get(normalized_category, normalized_category),
+                'total': 0,
+                'total_amount': 0,
+            }
+        qty = row['quantity'] or 0
+        price = row['product__price'] or 0
+        by_category_map[normalized_category]['total_amount'] += qty * price
+
+    by_category = sorted(by_category_map.values(), key=lambda row: row['total'], reverse=True)
+
+    # Total amount issued across all categories
+    total_amount_issued = sum(cat['total_amount'] for cat in by_category)
 
     # Totals by item (for table) - top 100 items
     by_item_rows = (
-        IssueHistory.objects.values('product__category', 'product__asset_id', 'product__item_name')
+        base_qs.values('product__category', 'product__asset_id', 'product__item_name')
         .annotate(total_qty=Sum('quantity'))
         .order_by('-total_qty')[:100]
     )
     by_item = [
         {
-            'category': label_map.get(r['product__category'], r['product__category']),
+            'category': label_map.get(_normalize_category_slug(r['product__category']), _normalize_category_slug(r['product__category'])),
             'asset_id': r['product__asset_id'],
             'item_name': r['product__item_name'],
             'total': r['total_qty'] or 0,
@@ -2419,6 +2785,9 @@ def issued_overview(request):
         'line_series_json': json.dumps(line_series),
         'by_category': by_category,
         'by_item': by_item,
+        'total_amount_issued': total_amount_issued,
+        'from_date': from_date,
+        'to_date': to_date,
     })
 
 

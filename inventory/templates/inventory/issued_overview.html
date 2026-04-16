@@ -10,6 +10,32 @@
         </div>
     </div>
 
+    <!-- Date Filter Form -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="d-flex gap-2 align-items-end">
+                <div>
+                    <label class="form-label mb-1" style="font-size:0.85rem;">From Date</label>
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+                </div>
+                <div>
+                    <label class="form-label mb-1" style="font-size:0.85rem;">To Date</label>
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                <a href="{% url 'inventory:issued_overview' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+            </form>
+        </div>
+    </div>
+
+    <!-- Total Amount Issued Card -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="mb-2">Total Amount Issued</h6>
+            <h3 class="mb-0" style="color: #2563eb;">₹{{ total_amount_issued|floatformat:0 }}</h3>
+        </div>
+    </div>
+
     <div class="row g-3">
 
         <!-- Left column: chart -->
@@ -17,7 +43,7 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h6 class="mb-2">Issued items by category (highest to lowest)</h6>
-                    <canvas id="line_categories" height="220"></canvas>
+                    <canvas id="line_categories" height="150"></canvas>
                 </div>
             </div>
         </div>
@@ -32,13 +58,13 @@
                     <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
                         <table class="table table-sm mb-0">
                             <thead class="sticky-top bg-white">
-                                <tr><th>Category</th><th>Total issued</th></tr>
+                                <tr><th>Category</th><th>Total issued</th><th>Amount (₹)</th></tr>
                             </thead>
                             <tbody>
                                 {% for r in by_category %}
-                                <tr><td>{{ r.name }}</td><td>{{ r.total }}</td></tr>
+                                <tr><td>{{ r.name }}</td><td>{{ r.total }}</td><td>{{ r.total_amount|floatformat:0 }}</td></tr>
                                 {% empty %}
-                                <tr><td colspan="2" class="text-muted">No data.</td></tr>
+                                <tr><td colspan="3" class="text-muted">No data.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

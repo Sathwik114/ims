@@ -51,6 +51,12 @@
     margin: 0;
   }
 
+  .rh-header-buttons {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .rh-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -178,6 +184,10 @@
   <div class="rh-page-header">
     <span class="page-eyebrow">Inventory</span>
     <h1>Returned History</h1>
+    <div class="rh-header-buttons">
+      <a href="{% url 'inventory:return_item' %}" class="btn-ir btn-ghost">Return an Item</a>
+      <a href="{% url 'inventory:returned_history' %}" class="btn-ir btn-primary">Returned History</a>
+    </div>
   </div>
 
   <div class="rh-card">
@@ -204,7 +214,6 @@
               <th>Section</th>
               <th>Asset ID</th>
               <th>Item Name</th>
-              <th>Returned By</th>
               <th>Quantity</th>
               <th>Returned At</th>
               <th>Taken By</th>
@@ -220,7 +229,6 @@
               <td>{{ item.get_section_display|default:item.section }}</td>
               <td>{{ item.product.asset_id }}</td>
               <td>{{ item.product.item_name }}</td>
-              <td>{% if item.returned_by %}{{ item.returned_by.username }}{% else %}-{% endif %}</td>
               <td>{{ item.quantity }}</td>
               <td>{{ item.returned_at|date:"Y-m-d H:i" }}</td>
               <td>{% if item.taken_by %}{{ item.taken_by.username }}{% else %}-{% endif %}</td>
@@ -228,7 +236,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="11" class="text-center" style="color:var(--ink-3); padding:2rem;">No returned items found.</td>
+              <td colspan="10" class="text-center" style="color:var(--ink-3); padding:2rem;">No returned items found.</td>
             </tr>
             {% endfor %}
           </tbody>
