@@ -2,7 +2,9 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User, Category, Rack, Product,
-    IssueRequest, IssueHistory, UploadHistory, Order, ManagementUploadRequest
+    IssueRequest, IssueHistory, UploadHistory, Order, ManagementUploadRequest,
+    PeripheralApplication, LoginHistory, DeletedHistory, PurchaseModificationHistory,
+    UserStageHistory, TemporaryItemHistory, ReturnedItem
 )
 
 
@@ -64,3 +66,45 @@ class OrderAdmin(admin.ModelAdmin):
 class ManagementUploadRequestAdmin(admin.ModelAdmin):
     list_display = ['product', 'quantity_requested', 'quantity_received', 'status', 'requested_by', 'created_at']
     list_filter = ['status', 'created_at']
+
+
+@admin.register(PeripheralApplication)
+class PeripheralApplicationAdmin(admin.ModelAdmin):
+    list_display = ['form_id', 'equipment_name', 'created_by', 'created_at']
+    list_filter = ['created_at']
+
+
+@admin.register(LoginHistory)
+class LoginHistoryAdmin(admin.ModelAdmin):
+    list_display = ['user', 'logged_in_at', 'ip_address', 'hostname', 'is_lan']
+    list_filter = ['logged_in_at', 'is_lan']
+
+
+@admin.register(DeletedHistory)
+class DeletedHistoryAdmin(admin.ModelAdmin):
+    list_display = ['asset_id', 'item_name', 'deleted_by', 'deleted_at']
+    list_filter = ['deleted_at']
+
+
+@admin.register(PurchaseModificationHistory)
+class PurchaseModificationHistoryAdmin(admin.ModelAdmin):
+    list_display = ['upload_request', 'modification_type', 'previous_quantity', 'new_quantity', 'modified_by', 'modified_at']
+    list_filter = ['modified_at', 'modification_type']
+
+
+@admin.register(UserStageHistory)
+class UserStageHistoryAdmin(admin.ModelAdmin):
+    list_display = ['user', 'old_stage', 'new_stage', 'changed_by', 'changed_at', 'hostname']
+    list_filter = ['changed_at', 'old_stage', 'new_stage']
+
+
+@admin.register(TemporaryItemHistory)
+class TemporaryItemHistoryAdmin(admin.ModelAdmin):
+    list_display = ['request_id', 'product', 'username', 'full_name', 'quantity', 'issued_at']
+    list_filter = ['issued_at']
+
+
+@admin.register(ReturnedItem)
+class ReturnedItemAdmin(admin.ModelAdmin):
+    list_display = ['request_id', 'product', 'username', 'full_name', 'quantity', 'returned_at']
+    list_filter = ['returned_at']

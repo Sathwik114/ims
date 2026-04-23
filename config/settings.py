@@ -13,6 +13,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '*',
     '10.40.20.4',
+
 ]
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -47,6 +48,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
                 'inventory.context_processors.stage_permissions',
             ],
         },
@@ -70,9 +72,17 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # }
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mssql',
+        'NAME': 'ITIMS',
+        'USER': 'sa',
+        'PASSWORD': 'ccise054879+m',
+        'HOST': '10.40.10.125',
+        'PORT': '1433',
+        'OPTIONS': {
+            'driver': 'SQL Server Native Client 11.0',
+        },
     },
+
 
     'sqlserver': {
         'ENGINE': 'mssql',
@@ -101,7 +111,10 @@ USE_I18N = True
 USE_TZ = False
 
 STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'inventory' / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'inventory' / 'static',
+    BASE_DIR / 'static',
+]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
@@ -112,6 +125,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'inventory:login'
 LOGIN_REDIRECT_URL = 'inventory:issue_requests'
 LOGOUT_REDIRECT_URL = 'inventory:login'
+
+# Session timeout: auto logout after 3 minutes of inactivity
+SESSION_COOKIE_AGE = 180
+SESSION_SAVE_EVERY_REQUEST = True
 
 # Custom: superusers are Stage 1; no category asked during createsuperuser
 AUTH_USER_MODEL = 'inventory.User'
@@ -126,8 +143,15 @@ EMAIL_TIMEOUT = 30
 
 # Email credentials - use environment variables like Next.js
 EMAIL_HOST_USER = os.environ.get('MAIL_USER', 's20330@gti.nws.cn')
-EMAIL_HOST_PASSWORD = os.environ.get('MAIL_PASS', 'SatS2@)#')
+EMAIL_HOST_PASSWORD = os.environ.get('MAIL_PASS', 'Sathya@2006')
 DEFAULT_FROM_EMAIL = os.environ.get('MAIL_USER', 's20330@gti.nws.cn')
 
 # For development, you can also use console backend to test
 # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# cd C:\inetpub\wwwroot\ims
+# set DJANGO_SECRET_KEY=1234
+# set DB_PASSWORD=ccise054879+m
+# set PAYROLL_DB_PASSWORD=dev.gtipay@123
+# set MAIL_USER=s20330@gti.nws.cn
+# set MAIL_PASS=Sathya@2006
+# waitress-serve --port=8000 config.wsgi:application

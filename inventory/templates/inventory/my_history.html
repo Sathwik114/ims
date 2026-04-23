@@ -43,6 +43,12 @@
                 <button class="btn btn-outline-secondary" id="btn_issued" onclick="showHistorySection('issued')" style="flex:1;">
                     Issued to me ({{ my_issued|length }})
                 </button>
+                <button class="btn btn-outline-secondary" id="btn_temporary" onclick="showHistorySection('temporary')" style="flex:1;">
+                    My temporary items ({{ my_temp_items|length }})
+                </button>
+                <button class="btn btn-outline-secondary" id="btn_returns" onclick="showHistorySection('returns')" style="flex:1;">
+                    My item returns ({{ my_returns|length }})
+                </button>
             </div>
         </div>
     </div>
@@ -148,18 +154,116 @@
             </div>
         </div>
     </div>
+
+    <!-- My Temporary Items -->
+    <div class="card" id="section_temporary" style="display:none;">
+        <div class="card-body">
+            <h6 class="card-title">My temporary items</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Status</th>
+                            <th>Reason</th>
+                            <th>Issued By</th>
+                            <th>Returned At</th>
+                            <th>Taken By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in my_temp_items %}
+                        <tr class="
+                            {% if item.status == 'issued' %}row-issued
+                            {% elif item.status == 'returned' %}row-approved
+                            {% endif %}
+                        ">
+                            <td class="text-muted small">{{ item.get_display_request_id }}</td>
+                            <td class="text-muted small">{{ item.issued_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ item.product.asset_id }} — {{ item.product.item_name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>
+                                {% if item.status == 'issued' %}
+                                    <span class="sb sb-issued"><span class="dot"></span> Issued</span>
+                                {% elif item.status == 'returned' %}
+                                    <span class="sb sb-approved"><span class="dot"></span> Returned</span>
+                                {% else %}
+                                    {{ item.get_status_display }}
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small">{{ item.reason|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.issued_by.username|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.returned_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.taken_by.username|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="9" class="text-muted">No temporary items found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- My Item Returns -->
+    <div class="card" id="section_returns" style="display:none;">
+        <div class="card-body">
+            <h6 class="card-title">My item returns</h6>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Username</th>
+                            <th>Full Name</th>
+                            <th>Department</th>
+                            <th>Section</th>
+                            <th>Reason</th>
+                            <th>Taken By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in my_returns %}
+                        <tr class="row-approved">
+                            <td class="text-muted small">{{ item.returned_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ item.product.asset_id }} — {{ item.product.item_name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td class="text-muted small">{{ item.username|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.full_name|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.department|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.section|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.reason|default:"-" }}</td>
+                            <td class="text-muted small">{{ item.taken_by.username|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="9" class="text-muted">No item returns found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
 // Toggle between sections
 function showHistorySection(sectionType) {
-  // Hide both sections
+  // Hide all sections
   document.getElementById('section_my_requests').style.display = 'none';
   document.getElementById('section_issued').style.display = 'none';
+  document.getElementById('section_temporary').style.display = 'none';
+  document.getElementById('section_returns').style.display = 'none';
   
   // Reset button styles
   document.getElementById('btn_my_requests').className = 'btn btn-outline-secondary';
   document.getElementById('btn_issued').className = 'btn btn-outline-secondary';
+  document.getElementById('btn_temporary').className = 'btn btn-outline-secondary';
+  document.getElementById('btn_returns').className = 'btn btn-outline-secondary';
   
   // Show selected section and highlight button
   document.getElementById('section_' + sectionType).style.display = 'block';
@@ -169,6 +273,8 @@ function showHistorySection(sectionType) {
 // Set default visibility
 document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('section_issued').style.display = 'none';
+  document.getElementById('section_temporary').style.display = 'none';
+  document.getElementById('section_returns').style.display = 'none';
 });
 </script>
 {% endblock %}

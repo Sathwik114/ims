@@ -151,6 +151,39 @@
         background-position: right 0.75rem center !important;
         padding-right: 2.2rem !important; cursor: pointer;
     }
+    .search-wrap { position: relative; }
+    .rack-suggestions {
+        position: absolute;
+        top: calc(100% + 0.3rem);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid rgba(180,140,220,0.3);
+        border-radius: 7px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .rack-suggestions::-webkit-scrollbar { width: 6px; }
+    .rack-suggestions::-webkit-scrollbar-track { background: #f5f3ff; border-radius: 3px; }
+    .rack-suggestions::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 3px; }
+    .rack-suggestions button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(200,205,225,0.3);
+        transition: background 0.15s;
+        font-size: 0.78rem;
+        color: #1e2035;
+    }
+    .rack-suggestions button:last-child { border-bottom: none; }
+    .rack-suggestions button:hover { background: #f5f3ff; }
 
     .au-error {
         font-size: 0.62rem; color: #dc2626; font-family: var(--mono);
@@ -298,7 +331,11 @@
                     </div>
                     <div class="au-field">
                         <label class="au-label">Rack No.</label>
-                        {{ form.rack }}
+                        <div class="search-wrap">
+                            <input type="text" id="rack_search" class="au-input" autocomplete="off" placeholder="Search or select rack..." value="">
+                            <input type="hidden" name="rack" id="selected_rack_id" value="">
+                            <div id="rack_suggestions" class="rack-suggestions"></div>
+                        </div>
                         {% if form.rack.errors %}<div class="au-error">{{ form.rack.errors.0 }}</div>{% endif %}
                     </div>
                     <div class="au-field">
@@ -364,4 +401,76 @@
 
 </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rackSearch = document.getElementById('rack_search');
+    const rackSuggestions = document.getElementById('rack_suggestions');
+    const selectedRackId = document.getElementById('selected_rack_id');
+
+    function clearSuggestions() {
+        rackSuggestions.innerHTML = '';
+        rackSuggestions.style.display = 'none';
+    }
+
+    rackSearch.addEventListener('input', function() {
+        const q = rackSearch.value.trim();
+        if (q.length < 1) {
+            clearSuggestions();
+            return;
+        }
+
+        let fetchTimeout;
+        clearTimeout(fetchTimeout);
+        fetchTimeout = setTimeout(() => {
+            fetch(`/api/racks/search/?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(racks => {
+                    rackSuggestions.innerHTML = '';
+                    
+                    if (!racks.length) {
+                        const noResults = document.createElement('button');
+                        noResults.type = 'button';
+                        noResults.textContent = 'No racks found';
+                        noResults.style.cssText = 'padding:0.5rem 0.75rem;color:#6b7280;cursor:default;';
+                        rackSuggestions.appendChild(noResults);
+                        rackSuggestions.style.display = 'block';
+                        return;
+                    }
+
+                    racks.forEach(r => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.innerHTML = `
+                            <div style="font-weight:700;">${r.rack_number}</div>
+                            ${r.cabin_name ? `<div style="font-size:0.75rem;color:#6b7280;">Cabin: ${r.cabin_name}</div>` : ''}
+                        `;
+                        
+                        button.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            rackSearch.value = r.rack_number;
+                            selectedRackId.value = r.id;
+                            clearSuggestions();
+                        });
+                        
+                        rackSuggestions.appendChild(button);
+                    });
+                    
+                    rackSuggestions.style.display = 'block';
+                })
+                .catch(() => {
+                    rackSuggestions.innerHTML = '<button type="button" style="padding:0.5rem 0.75rem;color:#ef4444;">Error loading racks</button>';
+                    rackSuggestions.style.display = 'block';
+                });
+        }, 300);
+    });
+
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!rackSuggestions.contains(e.target) && e.target !== rackSearch) {
+            clearSuggestions();
+        }
+    });
+});
+</script>
 {% endblock %}

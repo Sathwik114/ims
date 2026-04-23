@@ -296,6 +296,7 @@
             <h5>View Racks</h5>
             <p>Browse all racks and their inventory</p>
         </div>
+        <a href="{% url 'inventory:view_racks_excel' %}" class="btn btn-success" style="font-size: 0.8rem; padding: 0.4rem 0.8rem; font-weight: 600;">Export to Excel</a>
     </div>
 
     <!-- Stat tiles -->
@@ -371,6 +372,7 @@
                     {% for ri in rack_summary %}
                     <tr class="vr-row"
                         data-url="{% url 'inventory:rack_detail' ri.rack.pk %}"
+                        data-cat="{{ ri.category_slugs|default:'' }}"
                         data-q="{{ ri.rack.rack_number|lower }} {{ ri.rack.cabin_name|lower }}">
                         <td><span class="rack-chip">{{ ri.rack.rack_number }}</span></td>
                         <td><span class="cabin-txt">{{ ri.rack.cabin_name|default:"—" }}</span></td>

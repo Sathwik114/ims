@@ -279,6 +279,7 @@
     {% if rack_data %}
         {% for rack_info in rack_data %}
         <div class="ar-rack-block"
+             data-cat="{{ rack_info.category_slugs|default:'' }}"
              data-q="{{ rack_info.rack.rack_number|lower }} {{ rack_info.rack.cabin_name|lower }} {% for item in rack_info.items %}{{ item.item_name|lower }} {{ item.asset_id|lower }} {% endfor %}">
 
             <!-- Rack header -->

@@ -4,6 +4,8 @@ Stage 1 = full (superuser), Stage 2 = edit no user creation, Stage 3 = read-only
 """
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 STAGE_CHOICES = [(1, 'Stage 1'), (2, 'Stage 2'), (3, 'Stage 3')]
 
@@ -579,13 +581,26 @@ class IssueRequest(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.request_id:
-            last = (
-                IssueRequest.objects.exclude(request_id__isnull=True)
-                .order_by('-request_id')
-                .values_list('request_id', flat=True)
-                .first()
-            )
-            self.request_id = (last + 1) if last else 1000
+            # Use negative numbers for users without accounts (to identify with *** in display)
+            if self.requested_by is None:
+                # Get the last negative request_id (users without accounts)
+                last_negative = (
+                    IssueRequest.objects.filter(request_id__lt=0)
+                    .order_by('request_id')  # Most negative first
+                    .values_list('request_id', flat=True)
+                    .first()
+                )
+                self.request_id = (last_negative - 1) if last_negative else -1000
+            else:
+                # Normal positive request_id for users with accounts
+                last = (
+                    IssueRequest.objects.filter(request_id__gte=0)
+                    .exclude(request_id__isnull=True)
+                    .order_by('-request_id')
+                    .values_list('request_id', flat=True)
+                    .first()
+                )
+                self.request_id = (last + 1) if last else 1000
         
         # 🔹 Compress attachment if it's a new upload
         if self.attachment:
@@ -602,6 +617,20 @@ class IssueRequest(models.Model):
         if self.requested_by_id:
             return self.requested_by.username
         return '-'
+
+    @property
+    def request_id_display(self) -> str:
+        """Display request_id with *** if user has no account."""
+        # Check if the user in requested_by_username exists in Django User model
+        if self.requested_by_username:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            if not User.objects.filter(username=self.requested_by_username).exists():
+                return f"*** {self.request_id or self.id} ***"
+        # Also check if requested_by is None
+        if self.requested_by is None:
+            return f"*** {self.request_id or self.id} ***"
+        return str(self.request_id or self.id)
 
 
 class PeripheralApplication(models.Model):
@@ -711,6 +740,7 @@ class IssueHistory(models.Model):
     receiver = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='issues_received')
     receiver_full_name = models.CharField(max_length=200, blank=True, default='')
     receiver_mobile = models.CharField(max_length=30, blank=True, default='')
+    receiver_username = models.CharField(max_length=50, blank=True, default='')
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     total_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
@@ -725,7 +755,7 @@ class UploadHistory(models.Model):
     """Record when stock was uploaded (quantity added)."""
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='upload_history')
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploads_made')
-    quantity_added = models.PositiveIntegerField()
+    quantity_added = models.IntegerField()
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     total_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -846,6 +876,29 @@ class ManagementUploadRequest(models.Model):
         super().save(*args, **kwargs)
 
 
+class PurchaseModificationHistory(models.Model):
+    """Track modifications to purchase requests."""
+    MODIFICATION_TYPE_ADD = 'add'
+    MODIFICATION_TYPE_SUBTRACT = 'subtract'
+    MODIFICATION_TYPE_CHOICES = [
+        (MODIFICATION_TYPE_ADD, 'Add'),
+        (MODIFICATION_TYPE_SUBTRACT, 'Subtract'),
+    ]
+    
+    upload_request = models.ForeignKey(ManagementUploadRequest, on_delete=models.CASCADE, related_name='modifications')
+    modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='purchase_modifications')
+    modification_type = models.CharField(max_length=10, choices=MODIFICATION_TYPE_CHOICES)
+    previous_quantity = models.PositiveIntegerField()
+    new_quantity = models.PositiveIntegerField()
+    material_upload_form = models.FileField(upload_to='material_upload_forms_history/', null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    modified_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-modified_at']
+        verbose_name_plural = 'Purchase modification history'
+
+
 class UserStageHistory(models.Model):
     """Record of user stage changes."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stage_history')
@@ -885,13 +938,23 @@ class TemporaryItemHistory(models.Model):
     class Meta:
         ordering = ['-issued_at']
 
+    def has_account(self):
+        """Check if the requester has an account on the website."""
+        return self.issued_to is not None
+
+    def get_display_request_id(self):
+        """Get request ID with *** indicator for non-registered users."""
+        if self.request_id:
+            return f"***{self.request_id}" if not self.has_account() else self.request_id
+        return "N/A"
+
     def __str__(self):
         return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.issued_to.username if self.issued_to else self.username} ({self.status})"
 
 
 class ReturnedItem(models.Model):
     """Record of returned items."""
-    request_id = models.PositiveIntegerField(unique=True, null=True, blank=True, db_index=True)
+    request_id = models.CharField(max_length=20, unique=True, null=True, blank=True, db_index=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='returned_items')
     returned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='items_returned')
     returned_by_section = models.CharField(
@@ -934,16 +997,78 @@ class ReturnedItem(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.request_id:
-            last = (
-                ReturnedItem.objects.exclude(request_id__isnull=True)
-                .order_by('-request_id')
-                .values_list('request_id', flat=True)
-                .first()
-            )
-            self.request_id = (last + 1) if last else 1000
+            # Get the last numeric part from existing request IDs
+            last_numeric = 0
+            existing_ids = ReturnedItem.objects.exclude(request_id__isnull=True).values_list('request_id', flat=True)
+            for rid in existing_ids:
+                if rid and rid.startswith('RET'):
+                    try:
+                        num = int(rid[3:])  # Remove 'RET' prefix
+                        if num > last_numeric:
+                            last_numeric = num
+                    except ValueError:
+                        pass
+            self.request_id = f'RET{last_numeric + 1}'
         super().save(*args, **kwargs)
+
+    def has_account(self):
+        """Check if the actual returner (username) has an account on the website."""
+        try:
+            User.objects.get(username=self.username)
+            return True
+        except User.DoesNotExist:
+            return False
+
+    def get_display_request_id(self):
+        """Get request ID with *** indicator for non-registered users."""
+        if self.request_id:
+            return f"***{self.request_id}" if not self.has_account() else str(self.request_id)
+        return "N/A"
 
     def __str__(self):
         return f"{self.request_id if self.request_id else 'N/A'} - {self.product.asset_id} - {self.username or self.full_name}"
+
+
+@receiver(post_save, sender=User)
+def auto_associate_historical_data(sender, instance, created, **kwargs):
+    """
+    Automatically associate historical data when a user is created or updated.
+    This links IssueRequest, TemporaryItemHistory, ReturnedItem, IssueHistory records
+    where username matches the user's username.
+    """
+    from django.db import transaction
+    
+    with transaction.atomic():
+        # Update IssueRequest records
+        IssueRequest.objects.filter(
+            requested_by_username=instance.username,
+            requested_by__isnull=True
+        ).update(
+            requested_by=instance
+        )
+        
+        # Update TemporaryItemHistory records
+        TemporaryItemHistory.objects.filter(
+            username=instance.username,
+            issued_to__isnull=True
+        ).update(
+            issued_to=instance
+        )
+        
+        # Update ReturnedItem records
+        ReturnedItem.objects.filter(
+            username=instance.username,
+            returned_by__isnull=True
+        ).update(
+            returned_by=instance
+        )
+        
+        # Update IssueHistory records (issued to me) - match by receiver_username
+        IssueHistory.objects.filter(
+            receiver_username=instance.username,
+            receiver__isnull=True
+        ).update(
+            receiver=instance
+        )
 
 

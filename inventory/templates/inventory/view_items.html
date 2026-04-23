@@ -396,7 +396,7 @@
                 </thead>
                 <tbody id="vi-tbody">
                     {% for p in products %}
-                    <tr data-cat="{{ p.category|lower }}"
+                    <tr data-cat="{{ p.category_slug|default:p.category|lower }}"
                         data-q="{{ p.asset_id|lower }} {{ p.item_code|lower }} {{ p.item_name|lower }}">
 
                         <!-- Category — plain text -->

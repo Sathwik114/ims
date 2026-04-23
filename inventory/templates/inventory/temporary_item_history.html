@@ -1,5 +1,12 @@
 {% extends 'inventory/base.html' %}
 {% block title %}Temporary Item History{% endblock %}
+{% block extra_css %}
+<style>
+    .temporary-user-row {
+        background-color: #fff3cd !important;
+    }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container-fluid">
     <h5 class="mb-3">Temporary Item History</h5>
@@ -25,6 +32,11 @@
             <!-- Search Bar for Pending -->
             <form method="get" class="d-flex gap-2 mb-3">
                 <input type="text" name="pending_q" class="form-control" placeholder="Search pending items by request ID, asset ID, item name, or username..." value="{{ pending_q }}">
+                <select name="pending_user_type" class="form-select">
+                    <option value="">All Users</option>
+                    <option value="temporary" {% if pending_user_type == "temporary" %}selected{% endif %}>Temporary User</option>
+                    <option value="permanent" {% if pending_user_type == "permanent" %}selected{% endif %}>Permanent User</option>
+                </select>
                 <button type="submit" class="btn btn-primary">Search</button>
                 <a href="{% url 'inventory:temporary_item_history' %}" class="btn btn-outline-secondary">Clear</a>
             </form>
@@ -46,8 +58,8 @@
                     </thead>
                     <tbody>
                         {% for item in pending_items %}
-                        <tr>
-                            <td>{{ item.request_id|default:"-" }}</td>
+                        <tr{% if not item.issued_to %} class="temporary-user-row"{% endif %}>
+                            <td>{{ item.get_display_request_id }}</td>
                             <td>{{ item.product.asset_id }}</td>
                             <td>{{ item.product.item_name }}</td>
                             <td>{% if item.issued_to %}{{ item.issued_to.username }}{% elif item.username %}{{ item.username }}{% else %}N/A{% endif %}</td>
@@ -79,6 +91,11 @@
             <!-- Search Bar for Returned -->
             <form method="get" class="d-flex gap-2 mb-3">
                 <input type="text" name="returned_q" class="form-control" placeholder="Search returned items by request ID, asset ID, item name, or username..." value="{{ returned_q }}">
+                <select name="returned_user_type" class="form-select">
+                    <option value="">All Users</option>
+                    <option value="temporary" {% if returned_user_type == "temporary" %}selected{% endif %}>Temporary User</option>
+                    <option value="permanent" {% if returned_user_type == "permanent" %}selected{% endif %}>Permanent User</option>
+                </select>
                 <button type="submit" class="btn btn-primary">Search</button>
                 <a href="{% url 'inventory:temporary_item_history' %}" class="btn btn-outline-secondary">Clear</a>
             </form>
@@ -101,8 +118,8 @@
                     </thead>
                     <tbody>
                         {% for item in returned_items %}
-                        <tr>
-                            <td>{{ item.request_id|default:"-" }}</td>
+                        <tr{% if not item.issued_to %} class="temporary-user-row"{% endif %}>
+                            <td>{{ item.get_display_request_id }}</td>
                             <td>{{ item.product.asset_id }}</td>
                             <td>{{ item.product.item_name }}</td>
                             <td>{% if item.issued_to %}{{ item.issued_to.username }}{% elif item.username %}{{ item.username }}{% else %}N/A{% endif %}</td>

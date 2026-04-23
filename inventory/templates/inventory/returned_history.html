@@ -177,6 +177,10 @@
   .search-box input:focus {
     border-color: var(--accent);
   }
+
+  .temporary-user-row {
+    background-color: #fff3cd !important;
+  }
 </style>
 
 <div class="rh-page">
@@ -197,17 +201,34 @@
     </div>
     <div class="rh-card-body">
       <div class="search-box">
-        <form method="get" style="display:flex; gap:.5rem; flex:1;">
+        <form method="get" style="display:flex; gap:.5rem; flex:1; flex-wrap:wrap;">
           <input type="text" name="q" placeholder="Search by username, full name, asset ID, or item name..." value="{{ search_q }}">
-          <button type="submit" class="btn-ir btn-primary">Search</button>
+          <input type="date" name="from_date" placeholder="From date" value="{{ from_date }}">
+          <input type="date" name="to_date" placeholder="To date" value="{{ to_date }}">
+          <select name="user_type" style="border: 1.5px solid var(--border); border-radius: 7px; padding: .5rem .75rem; font-size: .875rem; background: var(--surface); outline: none;">
+            <option value="">All Users</option>
+            <option value="temporary" {% if user_type == "temporary" %}selected{% endif %}>Temporary User</option>
+            <option value="permanent" {% if user_type == "permanent" %}selected{% endif %}>Permanent User</option>
+          </select>
+          <a href="{% url 'inventory:returned_history' %}" class="btn-ir btn-outline-secondary" style="display:flex; align-items:center;">Clear</a>
         </form>
         <a href="{% url 'inventory:return_item' %}" class="btn-ir btn-primary" style="display:flex; align-items:center;">Return an Item</a>
+        <a href="{% url 'inventory:returned_history_excel' %}" class="btn-ir btn-primary" style="display:flex; align-items:center;">Export to Excel</a>
       </div>
+      <script>
+        // Auto-submit form when select elements change
+        document.querySelectorAll('select').forEach(select => {
+          select.addEventListener('change', function() {
+            this.form.submit();
+          });
+        });
+      </script>
 
       <div class="table-responsive" style="overflow-x: auto;">
         <table class="table table-hover">
           <thead>
             <tr>
+              <th>Request ID</th>
               <th>Username</th>
               <th>Full Name</th>
               <th>Department</th>
@@ -222,7 +243,8 @@
           </thead>
           <tbody>
             {% for item in returned_items %}
-            <tr>
+            <tr{% if item.get_display_request_id|slice:":3" == "***" %} class="temporary-user-row"{% endif %}>
+              <td>{{ item.get_display_request_id }}</td>
               <td>{{ item.username }}</td>
               <td>{{ item.full_name }}</td>
               <td>{{ item.get_department_display|default:item.department }}</td>
@@ -236,7 +258,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="10" class="text-center" style="color:var(--ink-3); padding:2rem;">No returned items found.</td>
+              <td colspan="11" class="text-center" style="color:var(--ink-3); padding:2rem;">No returned items found.</td>
             </tr>
             {% endfor %}
           </tbody>

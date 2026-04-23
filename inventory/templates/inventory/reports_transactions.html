@@ -24,6 +24,10 @@
 
 }
 
+.temporary-user-row {
+    background-color: #fff3cd !important;
+}
+
 
 
 /* Hide print-only status label on screen */
@@ -442,11 +446,52 @@
 
         <div class="col-auto">
 
-            <button type="submit" class="btn btn-primary">Filter</button>
+            <select name="user_type" class="form-select">
+
+                <option value="">All Users</option>
+
+                <option value="temporary" {% if user_type == "temporary" %}selected{% endif %}>Temporary User</option>
+
+                <option value="permanent" {% if user_type == "permanent" %}selected{% endif %}>Permanent User</option>
+
+            </select>
+
+        </div>
+
+        <div class="col-auto">
+
+            <select name="status_filter" class="form-select">
+
+                <option value="">All Status</option>
+
+                <option value="pending" {% if status_filter == "pending" %}selected{% endif %}>Pending</option>
+
+                <option value="approved" {% if status_filter == "approved" %}selected{% endif %}>Approved</option>
+
+                <option value="issued" {% if status_filter == "issued" %}selected{% endif %}>Issued</option>
+
+                <option value="confirmed" {% if status_filter == "confirmed" %}selected{% endif %}>Confirmed</option>
+
+            </select>
+
+        </div>
+
+        <div class="col-auto">
+
+            <a href="{% url 'inventory:reports_transactions' %}" class="btn btn-outline-secondary">Clear</a>
 
         </div>
 
     </form>
+
+    <script>
+        // Auto-submit form when select elements change
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', function() {
+                this.form.submit();
+            });
+        });
+    </script>
 
 
 
@@ -504,9 +549,9 @@
 
                         {% for ir in confirmed_requests %}
 
-                        <tr>
+                        <tr{% if not ir.requested_by %} class="temporary-user-row"{% endif %}>
 
-                            <td>{{ ir.requested_id|default:ir.request_id|default:ir.id }}</td>
+                            <td>{{ ir.request_id_display }}</td>
 
                             <td class="text-muted small">{{ ir.created_at|date:"Y-m-d H:i" }}</td>
 

@@ -290,6 +290,15 @@
             transform: rotate(180deg);
         }
 
+        /* Make dropdown appear on hover instead of click */
+        .dropdown:hover .dropdown-menu {
+            display: block;
+        }
+
+        .dropdown:hover .nb-link .bi-chevron-down {
+            transform: rotate(180deg);
+        }
+
         /* ── Dropdown ── */
         .nb-dropdown {
             /* ✦ CHANGED: dark purple dropdown */
@@ -300,7 +309,11 @@
             min-width: 210px;
             margin-top: 8px !important;
             background: rgba(35,20,60,0.97) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
             backdrop-filter: blur(12px) !important;
+            right: 0 !important;
+            left: auto !important;
+            transform: none !important;
         }
 
         .nb-dropdown .dropdown-item {
@@ -630,6 +643,7 @@
             width: 100vw;
             height: 100vh;
             background: rgba(26,15,46,0.50);
+            -webkit-backdrop-filter: blur(4px);
             backdrop-filter: blur(4px);
             z-index: 99999;
             display: flex;
@@ -1109,7 +1123,7 @@
         {% endif %}
 
         <!-- History (Reports) -->
-        {% if user_can_manage_users %}
+        {% if user_can_manage_users or user.stage == 2 %}
         <div class="dropdown">
             <a class="nb-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                 <i class="bi bi-graph-up"></i> History <i class="bi bi-chevron-down"></i>
@@ -1221,6 +1235,28 @@
         document.addEventListener('DOMContentLoaded', function () {
             const overlay = document.getElementById('msg-popup-overlay');
             const progress = document.getElementById('popup-progress');
+
+            // Fix dropdown hover issue - keep dropdown open when hovering over menu
+            const dropdowns = document.querySelectorAll('.dropdown');
+            dropdowns.forEach(dropdown => {
+                const dropdownMenu = dropdown.querySelector('.dropdown-menu');
+                if (dropdownMenu) {
+                    let timeout;
+                    
+                    dropdown.addEventListener('mouseenter', function() {
+                        clearTimeout(timeout);
+                        dropdown.classList.add('show');
+                        dropdownMenu.classList.add('show');
+                    });
+                    
+                    dropdown.addEventListener('mouseleave', function() {
+                        timeout = setTimeout(function() {
+                            dropdown.classList.remove('show');
+                            dropdownMenu.classList.remove('show');
+                        }, 200);
+                    });
+                }
+            });
 
             if (overlay) {
                 // Trigger animation

@@ -87,7 +87,7 @@ def _normalize_category_slug(raw_category):
     return normalized if normalized in valid else raw_category
 
 
-def _create_issue_history_entry(*, product, issued_by, approved_by, receiver, receiver_full_name, receiver_mobile, quantity):
+def _create_issue_history_entry(*, product, issued_by, approved_by, receiver, receiver_full_name, receiver_mobile, receiver_username, quantity):
     """Create a consistent IssueHistory record for issued items."""
     qty = int(quantity or 0)
     if qty <= 0:
@@ -105,6 +105,46 @@ def _create_issue_history_entry(*, product, issued_by, approved_by, receiver, re
         receiver=receiver,
         receiver_full_name=receiver_full_name or '',
         receiver_mobile=receiver_mobile or '',
+        receiver_username=receiver_username or '',
+        quantity=qty,
+        unit_price=unit_price,
+        total_cost=total_cost,
+    )
+
+
+def _normalize_category_slug(raw_category):
+    """Normalize legacy/spaced category values to canonical slugs."""
+    if raw_category is None:
+        return None
+    normalized = str(raw_category).strip().lower().replace('-', '_').replace(' ', '_')
+    aliases = {
+        'serverpart': 'server_parts',
+        'serverparts': 'server_parts',
+    }
+    normalized = aliases.get(normalized, normalized)
+    valid = {slug for slug, _ in CATEGORY_CHOICES}
+    return normalized if normalized in valid else raw_category
+
+
+def _create_issue_history_entry(*, product, issued_by, approved_by, receiver, receiver_full_name, receiver_mobile, receiver_username, quantity):
+    """Create a consistent IssueHistory record for issued items."""
+    qty = int(quantity or 0)
+    if qty <= 0:
+        return None
+    unit_price = _as_decimal(product.price)
+    total_cost = unit_price * Decimal(qty) if unit_price is not None else None
+    return IssueHistory.objects.create(
+        product=product,
+        issued_by=issued_by,
+        issued_by_section=(issued_by.section if issued_by else ''),
+        issued_by_department=(issued_by.department if issued_by else ''),
+        approved_by=approved_by,
+        approved_by_section=(approved_by.section if approved_by else ''),
+        approved_by_department=(approved_by.department if approved_by else ''),
+        receiver=receiver,
+        receiver_full_name=receiver_full_name or '',
+        receiver_mobile=receiver_mobile or '',
+        receiver_username=receiver_username or '',
         quantity=qty,
         unit_price=unit_price,
         total_cost=total_cost,
@@ -292,10 +332,44 @@ def login_view(request):
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
 
-            # LDAP authentication
+            # Check if user is superuser - allow Django auth without LDAP
+            try:
+                user = User.objects.get(username=username)
+                if user.is_superuser:
+                    # Superuser can login with Django password
+                    django_user = authenticate(request, username=username, password=password)
+                    if django_user:
+                        login(request, django_user)
+                        # Create login history
+                        try:
+                            ip, hostname = get_client_ip(request)
+                            ua = request.META.get('HTTP_USER_AGENT', '') or ''
+                            lan_connection = is_lan_ip(ip)
+                            LoginHistory.objects.create(
+                                user=django_user,
+                                ip_address=ip[:64],
+                                hostname=hostname[:255],
+                                user_agent=ua[:512],
+                                is_lan=lan_connection
+                            )
+                        except Exception:
+                            pass
+                        return redirect('inventory:dashboard')
+                    else:
+                        messages.error(request, 'Invalid username or password.')
+                        return redirect('inventory:login')
+            except User.DoesNotExist:
+                pass
+
+            # LDAP authentication for regular users
             if ldap_authenticate(username, password):
 
-                user, created = User.objects.get_or_create(username=username)
+                # Check if user exists in database (no auto-creation)
+                try:
+                    user = User.objects.get(username=username)
+                except User.DoesNotExist:
+                    messages.error(request, 'Your account does not exist in the system. Please contact a Stage 1 administrator to add your account.')
+                    return redirect('inventory:login')
                 
                 # Check if user is active before allowing login
                 if not user.is_active:
@@ -613,6 +687,7 @@ def view_items(request):
         if key not in grouped_products:
             grouped_products[key] = {
                 'category': product.get_category_display(),
+                'category_slug': product.category,
                 'asset_id': product.asset_id,
                 'item_code': product.item_code,
                 'item_name': product.item_name,
@@ -1018,6 +1093,32 @@ def search_products_internal_api(request):
 
 
 @login_required
+def search_racks_api(request):
+    """AJAX search for rack selection in add product form."""
+    if request.user.is_stage3():
+        return JsonResponse([], safe=False)
+    q = (request.GET.get('q') or '').strip()
+    if not q:
+        return JsonResponse([], safe=False)
+    qs = (
+        Rack.objects.filter(
+            Q(rack_number__icontains=q) |
+            Q(cabin_name__icontains=q)
+        )
+        .order_by('rack_number')[:10]
+    )
+    results = [
+        {
+            'id': r.id,
+            'rack_number': r.rack_number,
+            'cabin_name': r.cabin_name or '',
+        }
+        for r in qs
+    ]
+    return JsonResponse(results, safe=False)
+
+
+@login_required
 def get_user_by_username(request):
     username = request.GET.get('username', '').strip()
     print(f"API called with username: {username}")
@@ -1091,7 +1192,9 @@ def issue_requests_new(request):
     
     # Use category for Stage 1/2 users
     category = raw_category or 'networking'
-    products_qs = Product.objects.filter(category=category).order_by('asset_id')
+    # Normalize category to handle server parts variations
+    normalized_category = _normalize_category_slug(category)
+    products_qs = Product.objects.filter(category=normalized_category).order_by('asset_id')
     
     # Search by asset / code / name
     if search_q:
@@ -1279,6 +1382,17 @@ def issue_requests(request):
                 else:
                     temp_full_name = full_name or username
 
+            # Fetch full_name from empmast if user doesn't exist in Django
+            if issued_to_user:
+                temp_full_name = issued_to_user.full_name or issued_to_user.get_full_name() or issued_to_user.username
+            else:
+                from .models import get_employee_data_from_mssql
+                mssql_data = get_employee_data_from_mssql(username)
+                if mssql_data:
+                    temp_full_name = mssql_data.get('full_name', full_name or username)
+                else:
+                    temp_full_name = full_name or username
+
             # Auto-generate request_id with 'Temp' prefix
             # Get all request_ids that start with 'Temp' and extract the numeric part
             existing_ids = TemporaryItemHistory.objects.filter(
@@ -1299,7 +1413,7 @@ def issue_requests(request):
             max_num = max(numeric_parts) if numeric_parts else 0
             new_request_id = f'Temp{max_num + 1}' if max_num >= 1000 else 'Temp1000'
 
-            TemporaryItemHistory.objects.create(
+            temp_item = TemporaryItemHistory.objects.create(
                 request_id=new_request_id,
                 product=product,
                 issued_to=issued_to_user,
@@ -1310,6 +1424,37 @@ def issue_requests(request):
                 reason=reason,
                 status='issued'
             )
+
+            # Send email notification if user has Django account
+            if issued_to_user and issued_to_user.email and issued_to_user.email.strip():
+                try:
+                    from django.core.mail import send_mail
+                    from django.conf import settings
+                    send_mail(
+                        'Temporary Item Issued',
+                        f"""
+Dear {issued_to_user.full_name or issued_to_user.username},
+
+You have been issued the following temporary item:
+
+- Asset ID: {product.asset_id}
+- Item Name: {product.item_name}
+- Quantity: {quantity}
+- Request ID: {new_request_id}
+- Issued By: {request.user.username}
+- Reason: {reason}
+
+Please return this item when you are done using it.
+
+Thank you,
+Inventory Management System
+""",
+                        settings.DEFAULT_FROM_EMAIL,
+                        [issued_to_user.email],
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    pass  # Don't fail the issue if email fails
 
             # Update product quantity
             product.quantity_available -= int(quantity)
@@ -1349,10 +1494,10 @@ def issue_requests(request):
                 product=product,
                 requested_by=confirmed_by_user,
                 requested_by_username=username,
-                requested_by_full_name=user_full_name,
-                requested_by_mobile=user_mobile,
-                requested_by_department=user_department,
-                requested_by_section=user_section,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
                 quantity=int(quantity),
                 request_reason=reason,
                 attachment=attachment_path,
@@ -1360,12 +1505,12 @@ def issue_requests(request):
                 needs_confirmation=True,
                 # Auto-populate approved and issued fields
                 approved_by=request.user,
-                approved_by_department=request.user.department,
-                approved_by_section=request.user.section,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
                 approved_at=timezone.now(),
                 issued_by=request.user,
-                issued_by_department=request.user.department,
-                issued_by_section=request.user.section,
+                issued_by_department=(request.user.department or '')[:20],
+                issued_by_section=(request.user.section or '')[:50],
                 issued_at=timezone.now(),
             )
         else:
@@ -1374,10 +1519,10 @@ def issue_requests(request):
                 product=product,
                 requested_by=None,
                 requested_by_username=username,
-                requested_by_full_name=user_full_name,
-                requested_by_mobile=user_mobile,
-                requested_by_department=user_department,
-                requested_by_section=user_section,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
                 quantity=int(quantity),
                 request_reason=reason,
                 attachment=attachment_path,
@@ -1385,16 +1530,16 @@ def issue_requests(request):
                 needs_confirmation=False,
                 # Auto-populate approved, issued, and confirmed fields
                 approved_by=request.user,
-                approved_by_department=request.user.department,
-                approved_by_section=request.user.section,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
                 approved_at=timezone.now(),
                 issued_by=request.user,
-                issued_by_department=request.user.department,
-                issued_by_section=request.user.section,
+                issued_by_department=(request.user.department or '')[:20],
+                issued_by_section=(request.user.section or '')[:50],
                 issued_at=timezone.now(),
                 confirmed_by=request.user,
-                confirmed_by_department=request.user.department,
-                confirmed_by_section=request.user.section,
+                confirmed_by_department=(request.user.department or '')[:20],
+                confirmed_by_section=(request.user.section or '')[:50],
                 confirmed_at=timezone.now(),
             )
 
@@ -1532,6 +1677,8 @@ def temporary_item_history(request):
 
     pending_q = request.GET.get('pending_q', '').strip()
     returned_q = request.GET.get('returned_q', '').strip()
+    pending_user_type = request.GET.get('pending_user_type', '')
+    returned_user_type = request.GET.get('returned_user_type', '')
 
     # Base queries
     pending_items = TemporaryItemHistory.objects.filter(status='issued').select_related('product', 'issued_to', 'issued_by')
@@ -1546,20 +1693,35 @@ def temporary_item_history(request):
             Q(issued_to__username__icontains=pending_q)
         )
 
+    # Apply user type filter for pending items
+    if pending_user_type == 'temporary':
+        pending_items = pending_items.filter(issued_to__isnull=True)
+    elif pending_user_type == 'permanent':
+        pending_items = pending_items.filter(issued_to__isnull=False)
+
     # Apply search filter for returned items
     if returned_q:
         returned_items = returned_items.filter(
             Q(request_id__icontains=returned_q) |
             Q(product__asset_id__icontains=returned_q) |
             Q(product__item_name__icontains=returned_q) |
-            Q(issued_to__username__icontains=returned_q)
+            Q(issued_to__username__icontains=returned_q) |
+            Q(taken_by__username__icontains=returned_q)
         )
+
+    # Apply user type filter for returned items
+    if returned_user_type == 'temporary':
+        returned_items = returned_items.filter(issued_to__isnull=True)
+    elif returned_user_type == 'permanent':
+        returned_items = returned_items.filter(issued_to__isnull=False)
 
     return render(request, 'inventory/temporary_item_history.html', {
         'pending_items': pending_items,
         'returned_items': returned_items,
         'pending_q': pending_q,
         'returned_q': returned_q,
+        'pending_user_type': pending_user_type,
+        'returned_user_type': returned_user_type,
     })
 
 
@@ -1571,8 +1733,12 @@ def temporary_item_history_returned(request):
         return redirect('inventory:dashboard')
 
     from .models import TemporaryItemHistory
+    from datetime import datetime
 
     returned_q = request.GET.get('returned_q', '').strip()
+    returned_from_date = request.GET.get('returned_from_date', '').strip()
+    returned_to_date = request.GET.get('returned_to_date', '').strip()
+    user_type = request.GET.get('user_type', '')
 
     # Base query for returned items only
     returned_items = TemporaryItemHistory.objects.filter(status='returned').select_related('product', 'issued_to', 'issued_by', 'taken_by')
@@ -1583,12 +1749,97 @@ def temporary_item_history_returned(request):
             Q(request_id__icontains=returned_q) |
             Q(product__asset_id__icontains=returned_q) |
             Q(product__item_name__icontains=returned_q) |
-            Q(issued_to__username__icontains=returned_q)
+            Q(issued_to__username__icontains=returned_q) |
+            Q(taken_by__username__icontains=returned_q)
         )
+
+    # Apply date filter for returned items
+    if returned_from_date:
+        try:
+            returned_from_date_obj = datetime.strptime(returned_from_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__gte=returned_from_date_obj)
+        except ValueError:
+            pass
+    if returned_to_date:
+        try:
+            returned_to_date_obj = datetime.strptime(returned_to_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__lte=returned_to_date_obj)
+        except ValueError:
+            pass
+
+    # Apply user type filter
+    if user_type == 'temporary':
+        # Temporary users: issued_to is null (no account)
+        returned_items = returned_items.filter(issued_to__isnull=True)
+    elif user_type == 'permanent':
+        # Permanent users: issued_to is not null (has account)
+        returned_items = returned_items.filter(issued_to__isnull=False)
 
     return render(request, 'inventory/temporary_item_history_returned.html', {
         'returned_items': returned_items,
         'returned_q': returned_q,
+        'returned_from_date': returned_from_date,
+        'returned_to_date': returned_to_date,
+        'user_type': user_type,
+    })
+
+
+@login_required
+def temporary_item_history_returned(request):
+    """Display only returned temporary items for History dropdown."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can view temporary item history.')
+        return redirect('inventory:dashboard')
+
+    from .models import TemporaryItemHistory
+    from datetime import datetime
+
+    returned_q = request.GET.get('returned_q', '').strip()
+    returned_from_date = request.GET.get('returned_from_date', '').strip()
+    returned_to_date = request.GET.get('returned_to_date', '').strip()
+    user_type = request.GET.get('user_type', '')
+
+    # Base query for returned items only
+    returned_items = TemporaryItemHistory.objects.filter(status='returned').select_related('product', 'issued_to', 'issued_by', 'taken_by')
+
+    # Apply search filter for returned items
+    if returned_q:
+        returned_items = returned_items.filter(
+            Q(request_id__icontains=returned_q) |
+            Q(product__asset_id__icontains=returned_q) |
+            Q(product__item_name__icontains=returned_q) |
+            Q(issued_to__username__icontains=returned_q) |
+            Q(taken_by__username__icontains=returned_q)
+        )
+
+    # Apply date filter for returned items
+    if returned_from_date:
+        try:
+            returned_from_date_obj = datetime.strptime(returned_from_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__gte=returned_from_date_obj)
+        except ValueError:
+            pass
+    if returned_to_date:
+        try:
+            returned_to_date_obj = datetime.strptime(returned_to_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__lte=returned_to_date_obj)
+        except ValueError:
+            pass
+
+    # Apply user type filter
+    if user_type == 'temporary':
+        # Temporary users: issued_to is null (no account)
+        returned_items = returned_items.filter(issued_to__isnull=True)
+    elif user_type == 'permanent':
+        # Permanent users: issued_to is not null (has account)
+        returned_items = returned_items.filter(issued_to__isnull=False)
+
+    return render(request, 'inventory/temporary_item_history_returned.html', {
+        'returned_items': returned_items,
+        'returned_q': returned_q,
+        'returned_from_date': returned_from_date,
+        'returned_to_date': returned_to_date,
+        'user_type': user_type,
     })
 
 
@@ -1609,6 +1860,36 @@ def return_temp_item(request, pk):
     temp_item.returned_at = timezone.now()
     temp_item.taken_by = request.user
     temp_item.save()
+
+    # Send email notification if user has Django account
+    if temp_item.issued_to and temp_item.issued_to.email and temp_item.issued_to.email.strip():
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            send_mail(
+                'Temporary Item Returned',
+                f"""
+Dear {temp_item.issued_to.full_name or temp_item.issued_to.username},
+
+Your temporary item has been returned:
+
+- Asset ID: {temp_item.product.asset_id}
+- Item Name: {temp_item.product.item_name}
+- Quantity: {temp_item.quantity}
+- Request ID: {temp_item.request_id}
+- Returned At: {temp_item.returned_at.strftime('%Y-%m-%d %H:%M:%S')}
+- Taken By: {request.user.username}
+
+Thank you for returning the item.
+
+Inventory Management System
+""",
+                settings.DEFAULT_FROM_EMAIL,
+                [temp_item.issued_to.email],
+                fail_silently=True,
+            )
+        except Exception as e:
+            pass  # Don't fail the return if email fails
 
     # Increment product quantity
     temp_item.product.quantity_available += temp_item.quantity
@@ -1875,6 +2156,7 @@ def issue_request_issue(request, pk):
         receiver=ir.requested_by,
         receiver_full_name=ir.requested_by_full_name,
         receiver_mobile=ir.requested_by_mobile,
+        receiver_username=ir.requested_by_username,
         quantity=qty_to_issue,
         unit_price=unit_price,
         total_cost=total_cost,
@@ -2042,6 +2324,37 @@ def return_item(request):
             reason=reason,
         )
 
+        # Send email notification if user has Django account
+        if returned_by_user and returned_by_user.email and returned_by_user.email.strip():
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings
+                send_mail(
+                    'Item Returned Successfully',
+                    f"""
+Dear {returned_by_user.full_name or returned_by_user.username},
+
+Your item has been returned successfully:
+
+- Asset ID: {product.asset_id}
+- Item Name: {product.item_name}
+- Quantity: {quantity}
+- Request ID: {returned_item.request_id}
+- Returned At: {returned_item.returned_at.strftime('%Y-%m-%d %H:%M:%S')}
+- Taken By: {request.user.username}
+- Reason: {reason}
+
+Thank you for returning the item.
+
+Inventory Management System
+""",
+                    settings.DEFAULT_FROM_EMAIL,
+                    [returned_by_user.email],
+                    fail_silently=True,
+                )
+            except Exception as e:
+                pass  # Don't fail the return if email fails
+
         # Increase product quantity
         product.quantity_available += int(quantity)
         product.save()
@@ -2064,7 +2377,9 @@ def raise_request(request):
     
     # Use category for Stage 1/2 users
     category = raw_category or 'networking'
-    products_qs = Product.objects.filter(category=category).order_by('asset_id')
+    # Normalize category to handle server parts variations
+    normalized_category = _normalize_category_slug(category)
+    products_qs = Product.objects.filter(category=normalized_category).order_by('asset_id')
     
     # Search by asset / code / name
     if search_q:
@@ -2206,10 +2521,10 @@ def raise_request(request):
                 product=product,
                 requested_by=confirmed_by_user,
                 requested_by_username=username,
-                requested_by_full_name=user_full_name,
-                requested_by_mobile=user_mobile,
-                requested_by_department=user_department,
-                requested_by_section=user_section,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
                 quantity=int(quantity),
                 request_reason=reason,
                 attachment=attachment_path,
@@ -2217,12 +2532,12 @@ def raise_request(request):
                 needs_confirmation=True,
                 # Auto-populate approved and issued fields
                 approved_by=request.user,
-                approved_by_department=request.user.department,
-                approved_by_section=request.user.section,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
                 approved_at=timezone.now(),
                 issued_by=request.user,
-                issued_by_section=request.user.section,
-                issued_by_department=request.user.department,
+                issued_by_section=(request.user.section or '')[:50],
+                issued_by_department=(request.user.department or '')[:20],
                 issued_at=timezone.now(),
                 approved_quantity=int(quantity),
             )
@@ -2234,10 +2549,10 @@ def raise_request(request):
                 product=product,
                 requested_by=request.user,  # Use admin as requester
                 requested_by_username=username,
-                requested_by_full_name=user_full_name,
-                requested_by_mobile=user_mobile,
-                requested_by_department=user_department,
-                requested_by_section=user_section,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
                 quantity=int(quantity),
                 request_reason=reason,
                 attachment=attachment_path,
@@ -2245,21 +2560,250 @@ def raise_request(request):
                 needs_confirmation=False,
                 # Auto-populate approved, issued, and confirmed fields
                 approved_by=request.user,
-                approved_by_department=request.user.department,
-                approved_by_section=request.user.section,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
                 approved_at=timezone.now(),
                 issued_by=request.user,
-                issued_by_section=request.user.section,
-                issued_by_department=request.user.department,
+                issued_by_section=(request.user.section or '')[:50],
+                issued_by_department=(request.user.department or '')[:20],
                 issued_at=timezone.now(),
                 approved_quantity=int(quantity),
                 confirmed_by=request.user,
-                confirmed_by_section=request.user.section,
-                confirmed_by_department=request.user.department,
+                confirmed_by_section=(request.user.section or '')[:50],
+                confirmed_by_department=(request.user.department or '')[:20],
                 confirmed_at=timezone.now(),
             )
             _notify_issue_request_created(ir, request)
             messages.success(request, 'Request submitted and auto-confirmed. Issue completed.')
+
+        # Update product quantity
+        product.quantity_available -= int(quantity)
+        product.save()
+
+        return redirect('inventory:raise_request')
+
+    return render(request, 'inventory/raise_request.html', {
+        'category': category,
+        'category_name': dict(CATEGORY_CHOICES).get(category, category),
+        'products': products,
+        'search_q': search_q,
+    })
+
+
+@login_required
+def raise_request(request):
+    """Raise a Request - duplicate of new issue form on a separate page."""
+    if not request.user.can_approve_issue_requests():
+        messages.error(request, 'Only Stage 1/2 users can raise requests.')
+        return redirect('inventory:dashboard')
+
+    raw_category = request.GET.get('category', '').strip()
+    search_q = request.GET.get('q', '').strip()
+    
+    # Use category for Stage 1/2 users
+    category = raw_category or 'networking'
+    # Normalize category to handle server parts variations
+    normalized_category = _normalize_category_slug(category)
+    products_qs = Product.objects.filter(category=normalized_category).order_by('asset_id')
+    
+    # Search by asset / code / name
+    if search_q:
+        products_qs = products_qs.filter(
+            Q(asset_id__icontains=search_q) |
+            Q(item_code__icontains=search_q) |
+            Q(item_name__icontains=search_q)
+        )
+    
+    products = products_qs
+    
+    # Handle new_issue form submission
+    if request.method == 'POST' and request.POST.get('action') == 'new_issue':
+        username = request.POST.get('username')
+        product_asset_id = request.POST.get('product_asset_id')
+        quantity = request.POST.get('quantity')
+        reason = request.POST.get('reason')
+        mobile = request.POST.get('mobile', '').strip()
+        department = request.POST.get('department', '').strip()
+        section = request.POST.get('section', '').strip()
+        full_name = request.POST.get('full_name', '').strip()
+        attachment = request.FILES.get('attachment')
+        request_type = request.POST.get('request_type', 'permanent')
+
+        if not username:
+            messages.error(request, 'Username is required.')
+            return redirect('inventory:raise_request')
+        if not product_asset_id:
+            messages.error(request, 'Please select an item from the search results.')
+            return redirect('inventory:raise_request')
+        if not quantity:
+            messages.error(request, 'Quantity is required.')
+            return redirect('inventory:raise_request')
+        if not reason:
+            messages.error(request, 'Reason is required.')
+            return redirect('inventory:raise_request')
+
+        product = get_object_or_404(Product, asset_id=product_asset_id)
+
+        if product.quantity_available < int(quantity):
+            messages.error(request, 'Insufficient quantity.')
+            return redirect('inventory:raise_request')
+
+        # Try to get user from Django, if not found, use empmast data
+        try:
+            selected_user = User.objects.get(username=username)
+            issued_to_user = selected_user
+        except User.DoesNotExist:
+            issued_to_user = None
+
+        # Handle file upload with compression
+        attachment_filename = _handle_compressed_upload(attachment, 'issue_request_files') if attachment else None
+
+        # Ensure proper path for Django FileField
+        if attachment_filename and not attachment_filename.startswith('issue_request_files/'):
+            attachment_path = f'issue_request_files/{attachment_filename}'
+        else:
+            attachment_path = attachment_filename
+
+        # Route to TemporaryItemHistory if request type is temporary
+        if request_type == 'temporary':
+            from .models import TemporaryItemHistory
+
+            # Fetch full_name from empmast if user doesn't exist in Django
+            if issued_to_user:
+                temp_full_name = issued_to_user.full_name or issued_to_user.get_full_name() or issued_to_user.username
+            else:
+                from .models import get_employee_data_from_mssql
+                mssql_data = get_employee_data_from_mssql(username)
+                if mssql_data:
+                    temp_full_name = mssql_data.get('full_name', full_name or username)
+                else:
+                    temp_full_name = full_name or username
+
+            # Auto-generate request_id with 'Temp' prefix
+            existing_ids = TemporaryItemHistory.objects.filter(
+                request_id__startswith='Temp'
+            ).values_list('request_id', flat=True)
+
+            numeric_parts = []
+            for rid in existing_ids:
+                if rid and rid.startswith('Temp'):
+                    try:
+                        num = int(rid[4:])
+                        numeric_parts.append(num)
+                    except ValueError:
+                        pass
+
+            max_num = max(numeric_parts) if numeric_parts else 0
+            new_request_id = f'Temp{max_num + 1}' if max_num >= 1000 else 'Temp1000'
+
+            TemporaryItemHistory.objects.create(
+                request_id=new_request_id,
+                product=product,
+                issued_to=issued_to_user,
+                issued_by=request.user,
+                username=username,
+                full_name=temp_full_name,
+                quantity=int(quantity),
+                reason=reason,
+                status='issued'
+            )
+
+            # Update product quantity
+            product.quantity_available -= int(quantity)
+            product.save()
+
+            messages.success(request, 'Temporary item issued successfully.')
+            return redirect('inventory:raise_request')
+
+        # For permanent requests, continue with existing IssueRequest logic
+        try:
+            selected_user = User.objects.get(username=username)
+            user_full_name = selected_user.full_name or selected_user.get_full_name() or selected_user.username
+            user_mobile = mobile or selected_user.mobile_number or ''
+            user_department = department or selected_user.department
+            user_section = section or selected_user.section
+            confirmed_by_user = selected_user
+        except User.DoesNotExist:
+            # User doesn't exist in Django, use empmast data or form data
+            from .models import get_employee_data_from_mssql
+            mssql_data = get_employee_data_from_mssql(username)
+            if mssql_data:
+                user_full_name = mssql_data.get('full_name', full_name or username)
+                user_mobile = mobile or mssql_data.get('mobile_number', '')
+                user_department = department or mssql_data.get('department', '')
+                user_section = section or mssql_data.get('section', '')
+            else:
+                user_full_name = full_name or username
+                user_mobile = mobile or ''
+                user_department = department or ''
+                user_section = section or ''
+            confirmed_by_user = None  # No Django user to confirm
+
+        # Create issue request with status based on user existence
+        if confirmed_by_user:
+            # User exists in Django - needs confirmation
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=confirmed_by_user,
+                requested_by_username=username,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_ISSUED,
+                needs_confirmation=True,
+                # Auto-populate approved and issued fields
+                approved_by=request.user,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_section=(request.user.section or '')[:50],
+                issued_by_department=(request.user.department or '')[:20],
+                issued_at=timezone.now(),
+                approved_quantity=int(quantity),
+            )
+            _notify_issue_request_created(ir, request)
+            messages.success(request, 'Request submitted and auto-issued. Waiting for user confirmation.')
+        else:
+            # User doesn't exist in Django - auto-confirm
+            ir = IssueRequest.objects.create(
+                product=product,
+                requested_by=request.user,  # Use admin as requester
+                requested_by_username=username,
+                requested_by_full_name=user_full_name[:200],
+                requested_by_mobile=user_mobile[:30],
+                requested_by_department=user_department[:20],
+                requested_by_section=user_section[:50],
+                quantity=int(quantity),
+                request_reason=reason,
+                attachment=attachment_path,
+                status=IssueRequest.STATUS_CONFIRMED,
+                needs_confirmation=False,
+                # Auto-populate approved, issued, and confirmed fields
+                approved_by=request.user,
+                approved_by_department=(request.user.department or '')[:20],
+                approved_by_section=(request.user.section or '')[:50],
+                approved_at=timezone.now(),
+                issued_by=request.user,
+                issued_by_section=(request.user.section or '')[:50],
+                issued_by_department=(request.user.department or '')[:20],
+                issued_at=timezone.now(),
+                approved_quantity=int(quantity),
+                confirmed_by=request.user,
+                confirmed_by_section=(request.user.section or '')[:50],
+                confirmed_by_department=(request.user.department or '')[:20],
+                confirmed_at=timezone.now(),
+            )
+            _notify_issue_request_created(ir, request)
+            messages.success(request, 'Request submitted and auto-confirmed. Issue completed.')
+
+        # Update product quantity
+        product.quantity_available -= int(quantity)
+        product.save()
 
         return redirect('inventory:raise_request')
 
@@ -2278,7 +2822,12 @@ def returned_history(request):
         messages.error(request, 'Only Stage 1/2 users can view returned history.')
         return redirect('inventory:dashboard')
 
+    from datetime import datetime
+
     search_q = request.GET.get('q', '').strip()
+    from_date = request.GET.get('from_date', '').strip()
+    to_date = request.GET.get('to_date', '').strip()
+    user_type = request.GET.get('user_type', '')
     returned_items = ReturnedItem.objects.all().select_related('product', 'returned_by', 'taken_by').order_by('-returned_at')
 
     if search_q:
@@ -2289,9 +2838,33 @@ def returned_history(request):
             Q(product__item_name__icontains=search_q)
         )
 
+    if from_date:
+        try:
+            from_date_obj = datetime.strptime(from_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__gte=from_date_obj)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            to_date_obj = datetime.strptime(to_date, '%Y-%m-%d').date()
+            returned_items = returned_items.filter(returned_at__date__lte=to_date_obj)
+        except ValueError:
+            pass
+
+    # Apply user type filter
+    if user_type == 'temporary':
+        # Temporary users: username not in User table
+        returned_items = returned_items.exclude(username__in=User.objects.values_list('username', flat=True))
+    elif user_type == 'permanent':
+        # Permanent users: username in User table
+        returned_items = returned_items.filter(username__in=User.objects.values_list('username', flat=True))
+
     return render(request, 'inventory/returned_history.html', {
         'returned_items': returned_items,
         'search_q': search_q,
+        'from_date': from_date,
+        'to_date': to_date,
+        'user_type': user_type,
     })
 
 
@@ -2788,6 +3361,9 @@ def issued_overview(request):
         'total_amount_issued': total_amount_issued,
         'from_date': from_date,
         'to_date': to_date,
+        'total_amount_issued': total_amount_issued,
+        'from_date': from_date,
+        'to_date': to_date,
     })
 
 
@@ -2937,8 +3513,26 @@ def my_history(request):
     search_requests = request.GET.get('search_requests', '').strip()
     search_issued = request.GET.get('search_issued', '').strip()
     
-    my_requests = IssueRequest.objects.filter(requested_by=request.user).select_related('product').order_by('-created_at')[:200]
-    my_issued = IssueHistory.objects.filter(receiver=request.user).select_related('product', 'issued_by', 'approved_by').order_by('-issued_at')[:200]
+    # My requests - only show if requested_by_username matches current user
+    my_requests = IssueRequest.objects.filter(
+        requested_by_username=request.user.username
+    ).select_related('product').order_by('-created_at')[:200]
+    
+    # Issued to me - only show IssueHistory records where receiver is current user
+    from .models import IssueHistory, TemporaryItemHistory, ReturnedItem
+    my_issued = IssueHistory.objects.filter(
+        receiver=request.user
+    ).select_related('product', 'issued_by', 'approved_by').order_by('-issued_at')[:200]
+    
+    # Temporary items - only show if username matches current user
+    my_temp_items = TemporaryItemHistory.objects.filter(
+        username=request.user.username
+    ).select_related('product', 'issued_to', 'issued_by', 'taken_by').order_by('-issued_at')[:200]
+    
+    # Returned items - only show if username matches current user
+    my_returns = ReturnedItem.objects.filter(
+        username=request.user.username
+    ).select_related('product', 'returned_by', 'taken_by').order_by('-returned_at')[:200]
     
     if search_requests:
         my_requests = my_requests.filter(
@@ -2956,6 +3550,8 @@ def my_history(request):
     return render(request, 'inventory/my_history.html', {
         'my_requests': my_requests, 
         'my_issued': my_issued,
+        'my_temp_items': my_temp_items,
+        'my_returns': my_returns,
         'search_requests': search_requests,
         'search_issued': search_issued,
     })
@@ -3102,9 +3698,9 @@ def item_requests_history_excel(request):
     
     # Headers
     headers = [
-        'Request ID', 'Date/Time', 'Asset ID', 'Item Name', 'User', 'User Dept|Section', 
+        'Request ID', 'Requested Date/Time', 'Asset ID', 'Item Name', 'User', 'User Dept|Section', 
         'Mobile', 'Quantity', 'Reason for Request', 'Approved By', 'Rejected By', 
-        'Reject Reason', 'Issued By', 'Confirmed By', 'Confirmed DateTime', 'Status'
+        'Reject Reason', 'Issued By', 'Confirmed By', 'Confirmed DateTime'
     ]
     
     # Add headers
@@ -3134,7 +3730,6 @@ def item_requests_history_excel(request):
             f"{ir.issued_by.username}" + (f"\n{ir.issued_by.get_full_name()}" if ir.issued_by.get_full_name() else "") if ir.issued_by else '',
             f"{ir.confirmed_by.username}" + (f"\n{ir.confirmed_by.get_full_name()}" if ir.confirmed_by.get_full_name() else "") if ir.confirmed_by else '',
             ir.confirmed_at.strftime('%Y-%m-%d %H:%M') if ir.confirmed_at else '',
-            ir.get_status_display()
         ]
         
         for col, value in enumerate(data, 1):
@@ -3148,7 +3743,7 @@ def item_requests_history_excel(request):
                 cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
     
     # Set column widths
-    column_widths = [12, 18, 12, 25, 20, 18, 12, 8, 30, 20, 20, 30, 20, 20, 18, 12]
+    column_widths = [12, 18, 12, 25, 20, 18, 12, 8, 30, 20, 20, 30, 20, 20, 18]
     for col, width in enumerate(column_widths, 1):
         ws.column_dimensions[get_column_letter(col)].width = width
     
@@ -3214,6 +3809,9 @@ def management_upload_requests(request):
             return redirect('inventory:management_upload_requests')
 
         material_upload_form_file = request.FILES.get('material_upload_form')
+        if not material_upload_form_file:
+            messages.error(request, 'Please upload a Material Request Form file.')
+            return redirect('inventory:management_upload_requests')
 
         # Create separate records for each item, all sharing the same PDF file
         created_count = 0
@@ -3338,6 +3936,120 @@ def management_upload_request_fulfill(request, pk):
 
     messages.success(request, 'Request updated.')
     return redirect('inventory:management_upload_requests')
+
+
+# ---- Modify Received Quantity ----
+@login_required
+@require_POST
+def management_upload_request_modify(request):
+    from .models import PurchaseModificationHistory
+    
+    try:
+        if not (request.user.stage in [1, 2] or request.user.is_superuser):
+            return JsonResponse({'success': False, 'error': 'Only Stage 1/2 can modify.'})
+        
+        upload_request_pk = request.POST.get('upload_request_pk')
+        modification_type = request.POST.get('modification_type')
+        modification_quantity = request.POST.get('modification_quantity')
+        notes = request.POST.get('notes', '')
+        
+        if not upload_request_pk or not modification_type or not modification_quantity:
+            return JsonResponse({'success': False, 'error': 'Missing required fields.'})
+        
+        try:
+            qty = int(modification_quantity)
+            if qty <= 0:
+                return JsonResponse({'success': False, 'error': 'Quantity must be positive.'})
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid quantity.'})
+        
+        req = get_object_or_404(ManagementUploadRequest, pk=upload_request_pk)
+        
+        previous_quantity = req.quantity_received
+        new_quantity = previous_quantity
+        
+        if modification_type == 'add':
+            new_quantity = previous_quantity + qty
+            # Update on_hand (quantity_available) - increase
+            req.product.quantity_available += qty
+            req.product.save()
+            
+            # Create UploadHistory for the added quantity
+            unit_price = _as_decimal(req.product.price)
+            total_cost = unit_price * Decimal(qty) if unit_price else None
+            
+            UploadHistory.objects.create(
+                product=req.product,
+                uploaded_by=request.user,
+                quantity_added=qty,
+                unit_price=unit_price,
+                total_cost=total_cost,
+            )
+            
+        elif modification_type == 'subtract':
+            if qty > previous_quantity:
+                return JsonResponse({'success': False, 'error': 'Cannot subtract more than received quantity.'})
+            new_quantity = previous_quantity - qty
+            # Update on_hand (quantity_available) - decrease
+            req.product.quantity_available -= qty
+            req.product.save()
+            
+            # Create UploadHistory for the subtracted quantity (negative)
+            unit_price = _as_decimal(req.product.price)
+            total_cost = unit_price * Decimal(qty) if unit_price else None
+            
+            UploadHistory.objects.create(
+                product=req.product,
+                uploaded_by=request.user,
+                quantity_added=-qty,  # Negative to indicate subtraction
+                unit_price=unit_price,
+                total_cost=total_cost,
+            )
+        else:
+            return JsonResponse({'success': False, 'error': 'Invalid modification type.'})
+        
+        # Calculate new remaining
+        new_remaining = req.quantity_requested - new_quantity
+        
+        # Delete any auto-created request for the same product and user that is pending
+        # This handles the case where a partial receive created a new request
+        ManagementUploadRequest.objects.filter(
+            product=req.product,
+            requested_by=req.requested_by,
+            status=ManagementUploadRequest.STATUS_PENDING,
+            quantity_requested=req.quantity_requested - previous_quantity,
+            quantity_received=0
+        ).delete()
+        
+        # If there's a new remaining quantity, create a new request
+        if new_remaining > 0:
+            ManagementUploadRequest.objects.create(
+                product=req.product,
+                requested_by=req.requested_by,
+                quantity_requested=new_remaining,
+                quantity_received=0,
+                status=ManagementUploadRequest.STATUS_PENDING,
+            )
+        
+        # Update the request's quantity_received
+        req.quantity_received = new_quantity
+        req.save()
+        
+        # Create PurchaseModificationHistory record
+        PurchaseModificationHistory.objects.create(
+            upload_request=req,
+            modified_by=request.user,
+            modification_type=modification_type,
+            previous_quantity=previous_quantity,
+            new_quantity=new_quantity,
+            material_upload_form=req.material_upload_form,
+            notes=notes,
+        )
+        
+        return JsonResponse({'success': True, 'new_quantity': new_quantity})
+    
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 # ---- Disclose Request ----
@@ -3640,6 +4352,8 @@ def reports_transactions(request):
     from_date = request.GET.get('from', '')
     to_date = request.GET.get('to', '')
     month = request.GET.get('month', '')
+    user_type = request.GET.get('user_type', '')
+    status_filter = request.GET.get('status_filter', '')
     
     # Use the same query as item_requests_history for consistency
     qs = IssueRequest.objects.select_related('product', 'requested_by', 'approved_by', 'rejected_by', 'issued_by', 'confirmed_by').order_by('-created_at')
@@ -3654,11 +4368,40 @@ def reports_transactions(request):
         except ValueError:
             pass
     
+    # Apply status filter
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    
+    # Apply user type filter
+    if user_type == 'temporary':
+        # Temporary users: requested_by is null OR requested_by_username not in User table
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        # Get all usernames that exist in User table
+        existing_usernames = set(User.objects.values_list('username', flat=True))
+        # Filter where requested_by is null OR requested_by_username not in existing usernames
+        temporary_qs = qs.filter(requested_by__isnull=True)
+        # Also filter where requested_by_username is set but not in User table
+        temp_username_qs = qs.filter(requested_by_username__isnull=False).exclude(requested_by_username__in=existing_usernames)
+        qs = temporary_qs | temp_username_qs
+    elif user_type == 'permanent':
+        # Permanent users: requested_by is not null AND (if requested_by_username set, exists in User table)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        # Get all usernames that exist in User table
+        existing_usernames = set(User.objects.values_list('username', flat=True))
+        # Filter where requested_by is not null AND (requested_by_username is null OR exists in User table)
+        qs = qs.filter(requested_by__isnull=False).filter(
+            Q(requested_by_username__isnull=True) | Q(requested_by_username__in=existing_usernames)
+        )
+    
     return render(request, 'inventory/reports_transactions.html', {
         'confirmed_requests': qs[:500],  # Use same variable name as item_requests_history
         'from_date': from_date,
         'to_date': to_date,
         'search_month': month,
+        'user_type': user_type,
+        'status_filter': status_filter,
     })
 
 
@@ -3696,20 +4439,35 @@ def reports_transactions_pdf(request):
     styles = getSampleStyleSheet()
     elements = [Paragraph('All Transactions', styles['Title']), Spacer(1, 12)]
     elements.append(Paragraph('Item Requests History', styles['Heading2']))
-    data = [['Requested Date', 'Asset ID', 'Item', 'Requested By', 'Dept|Section', 'Mobile', 'Quantity', 'Status', 'Approved By', 'Issued By', 'Confirmed By']]
+    data = [['Request ID', 'Requested Date/Time', 'Asset ID', 'Item Name', 'User', 'User Dept|Section', 'Mobile', 'Quantity', 'Reason for Request', 'Approved By', 'Rejected By', 'Reject Reason', 'Issued By', 'Confirmed By', 'Confirmed DateTime', 'Status']]
     for r in qs[:200]:
+        # Display *** around request_id if user has no account
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user_has_no_account = False
+        if r.requested_by_username and not User.objects.filter(username=r.requested_by_username).exists():
+            user_has_no_account = True
+        elif r.requested_by is None:
+            user_has_no_account = True
+        
+        request_id_display = f"*** {r.request_id or r.id} ***" if user_has_no_account else (r.request_id or r.id)
         data.append([
-            r.created_at.strftime('%Y-%m-%d %H:%M'), 
-            r.product.asset_id, 
-            r.product.item_name, 
-            r.requested_by.username,
-            f"{r.get_requested_by_department_display()|default:'-'}|{r.get_requested_by_section_display()|default:'-'}",
-            r.requested_by_mobile or '-',
-            r.approved_quantity or r.quantity,
-            r.get_status_display(),
-            r.approved_by.username if r.approved_by else '-',
-            r.issued_by.username if r.issued_by else '-',
-            r.confirmed_by.username if r.confirmed_by else '-'
+            request_id_display,
+            r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
+            r.product.asset_id if r.product else '',
+            r.product.item_name if r.product else '',
+            f"{r.requested_by.username} | {r.requested_by_full_name}" if r.requested_by else '',
+            f"{r.get_requested_by_department_display() or '-'}|{r.get_requested_by_section_display() or '-'}",
+            r.requested_by_mobile or '',
+            str(r.approved_quantity or r.quantity),
+            r.request_reason or '',
+            f"{r.approved_by.username}" + (f"\n{r.approved_by.get_full_name()}" if r.approved_by.get_full_name() else "") if r.approved_by else '',
+            f"{r.rejected_by.username}" + (f"\n{r.rejected_by.get_full_name()}" if r.rejected_by.get_full_name() else "") if r.rejected_by else '',
+            r.rejection_reason or '',
+            f"{r.issued_by.username}" + (f"\n{r.issued_by.get_full_name()}" if r.issued_by.get_full_name() else "") if r.issued_by else '',
+            f"{r.confirmed_by.username}" + (f"\n{r.confirmed_by.get_full_name()}" if r.confirmed_by.get_full_name() else "") if r.confirmed_by else '',
+            r.confirmed_at.strftime('%Y-%m-%d %H:%M') if r.confirmed_at else '',
+            r.get_status_display()
         ])
     t = Table(data, repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey), ('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
@@ -3751,7 +4509,7 @@ def reports_transactions_excel(request):
     ws = wb.active
     ws.title = "All Transactions"
     
-    headers = ['Requested Date', 'Asset ID', 'Item', 'Requested By', 'Dept|Section', 'Mobile', 'Quantity', 'Status', 'Approved By', 'Issued By', 'Confirmed By']
+    headers = ['Request ID', 'Requested Date/Time', 'Asset ID', 'Item Name', 'User', 'User Dept|Section', 'Mobile', 'Quantity', 'Reason for Request', 'Approved By', 'Rejected By', 'Reject Reason', 'Issued By', 'Confirmed By', 'Confirmed DateTime', 'Status']
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = Font(bold=True, color="FFFFFF")
@@ -3761,18 +4519,33 @@ def reports_transactions_excel(request):
                            top=Side(style='thin'), bottom=Side(style='thin'))
     
     for row, r in enumerate(qs[:500], 2):
+        # Display *** around request_id if user has no account
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user_has_no_account = False
+        if r.requested_by_username and not User.objects.filter(username=r.requested_by_username).exists():
+            user_has_no_account = True
+        elif r.requested_by is None:
+            user_has_no_account = True
+        
+        request_id_display = f"*** {r.request_id or r.id} ***" if user_has_no_account else (r.request_id or r.id)
         data = [
-            r.created_at.strftime('%Y-%m-%d %H:%M'),
-            r.product.asset_id,
-            r.product.item_name,
-            r.requested_by.username if r.requested_by else '-',
+            request_id_display,
+            r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
+            r.product.asset_id if r.product else '',
+            r.product.item_name if r.product else '',
+            f"{r.requested_by.username} | {r.requested_by_full_name}" if r.requested_by else '',
             f"{r.get_requested_by_department_display() or '-'}|{r.get_requested_by_section_display() or '-'}",
-            r.requested_by_mobile or '-',
-            r.approved_quantity or r.quantity,
-            r.get_status_display(),
-            r.approved_by.username if r.approved_by else '-',
-            r.issued_by.username if r.issued_by else '-',
-            r.confirmed_by.username if r.confirmed_by else '-',
+            r.requested_by_mobile or '',
+            str(r.approved_quantity or r.quantity),
+            r.request_reason or '',
+            f"{r.approved_by.username}" + (f"\n{r.approved_by.get_full_name()}" if r.approved_by.get_full_name() else "") if r.approved_by else '',
+            f"{r.rejected_by.username}" + (f"\n{r.rejected_by.get_full_name()}" if r.rejected_by.get_full_name() else "") if r.rejected_by else '',
+            r.rejection_reason or '',
+            f"{r.issued_by.username}" + (f"\n{r.issued_by.get_full_name()}" if r.issued_by.get_full_name() else "") if r.issued_by else '',
+            f"{r.confirmed_by.username}" + (f"\n{r.confirmed_by.get_full_name()}" if r.confirmed_by.get_full_name() else "") if r.confirmed_by else '',
+            r.confirmed_at.strftime('%Y-%m-%d %H:%M') if r.confirmed_at else '',
+            r.get_status_display()
         ]
         for col, value in enumerate(data, 1):
             cell = ws.cell(row=row, column=col, value=value)
@@ -3780,7 +4553,7 @@ def reports_transactions_excel(request):
             cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
                                top=Side(style='thin'), bottom=Side(style='thin'))
     
-    column_widths = [18, 12, 25, 15, 15, 12, 10, 12, 15, 15, 15]
+    column_widths = [12, 18, 12, 25, 20, 18, 12, 8, 30, 20, 20, 30, 20, 20, 18, 12]
     for col, width in enumerate(column_widths, 1):
         ws.column_dimensions[get_column_letter(col)].width = width
     
@@ -4183,6 +4956,16 @@ def add_user(request):
                     section=user_data['section'],
                     password='temp123456'
                 )
+                # Link temporary items to the new user based on username or full_name matching
+                from inventory.models import TemporaryItemHistory
+                TemporaryItemHistory.objects.filter(
+                    issued_to__isnull=True,
+                    username=user_data['username']
+                ).update(issued_to=user)
+                TemporaryItemHistory.objects.filter(
+                    issued_to__isnull=True,
+                    full_name=user_data['full_name']
+                ).update(issued_to=user)
                 created_count += 1
             except Exception as e:
                 failed_count += 1
@@ -4356,14 +5139,14 @@ def view_racks(request):
             })
     
     # Calculate totals
-        total_items_count = 0
-        total_quantity_sum = 0
-        total_value_sum = Decimal('0.00')
-        
-        for rack_info in rack_summary:
-            total_items_count += rack_info['total_items']
-            total_quantity_sum += rack_info['total_quantity']
-            total_value_sum += rack_info['total_value']
+    total_items_count = 0
+    total_quantity_sum = 0
+    total_value_sum = Decimal('0.00')
+    
+    for rack_info in rack_summary:
+        total_items_count += rack_info['total_items']
+        total_quantity_sum += rack_info['total_quantity']
+        total_value_sum += rack_info['total_value']
     
     return render(request, 'inventory/view_racks.html', {
         'rack_summary': rack_summary,
@@ -4683,5 +5466,215 @@ def manage_users(request):
         'users': users,
         'search': search,
     })
+
+
+@login_required
+def temporary_item_history_returned_excel(request):
+    """Export returned temporary items to Excel."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can export temporary item history.')
+        return redirect('inventory:dashboard')
+
+    from .models import TemporaryItemHistory
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from django.http import HttpResponse
+
+    returned_items = TemporaryItemHistory.objects.filter(status='returned').select_related('product', 'issued_to', 'issued_by', 'taken_by')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Returned Temporary Items"
+
+    headers = ['Request ID', 'Asset ID', 'Item Name', 'Issued To', 'Issued By', 'Taken By', 'Quantity', 'Issued At', 'Returned At', 'Status', 'Reason']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+
+    for row, item in enumerate(returned_items, 2):
+        data = [
+            item.request_id or '',
+            item.product.asset_id if item.product else '',
+            item.product.item_name if item.product else '',
+            item.issued_to.username if item.issued_to else item.username,
+            item.issued_by.username if item.issued_by else '',
+            item.taken_by.username if item.taken_by else '',
+            item.quantity,
+            item.issued_at.strftime('%Y-%m-%d %H:%M') if item.issued_at else '',
+            item.returned_at.strftime('%Y-%m-%d %H:%M') if item.returned_at else '',
+            item.status,
+            item.reason
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=temporary_item_history_returned.xlsx'
+    wb.save(response)
+    return response
+
+
+@login_required
+def returned_history_excel(request):
+    """Export returned items history to Excel."""
+    if not request.user.can_approve_issue_requests():
+        messages.error(request, 'Only Stage 1/2 users can export returned history.')
+        return redirect('inventory:dashboard')
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from django.http import HttpResponse
+
+    returned_items = ReturnedItem.objects.all().select_related('product', 'returned_by', 'taken_by').order_by('-returned_at')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Returned Items History"
+
+    headers = ['Request ID', 'Asset ID', 'Item Name', 'Returned By', 'Returned By Dept', 'Returned By Section', 'Username', 'Full Name', 'Department', 'Section', 'Returned At']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+
+    for row, item in enumerate(returned_items, 2):
+        data = [
+            item.request_id or '',
+            item.product.asset_id if item.product else '',
+            item.product.item_name if item.product else '',
+            item.returned_by.username if item.returned_by else '',
+            item.get_returned_by_department_display() if item.returned_by else '',
+            item.get_returned_by_section_display() if item.returned_by else '',
+            item.username,
+            item.full_name,
+            item.get_department_display() if item.department else '',
+            item.get_section_display() if item.section else '',
+            item.returned_at.strftime('%Y-%m-%d %H:%M') if item.returned_at else ''
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=returned_history.xlsx'
+    wb.save(response)
+    return response
+
+
+@login_required
+def user_stage_history_excel(request):
+    """Export user stage history to Excel."""
+    if not request.user.can_manage_users():
+        messages.error(request, 'Only Stage 1 users can export user stage history.')
+        return redirect('inventory:dashboard')
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from django.http import HttpResponse
+
+    history = UserStageHistory.objects.all().select_related('user', 'changed_by').order_by('-changed_at')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "User Stage History"
+
+    headers = ['User', 'Old Stage', 'New Stage', 'Changed By', 'Changed At']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+
+    for row, item in enumerate(history, 2):
+        data = [
+            item.user.username if item.user else '',
+            item.old_stage,
+            item.new_stage,
+            item.changed_by.username if item.changed_by else '',
+            item.changed_at.strftime('%Y-%m-%d %H:%M') if item.changed_at else ''
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=user_stage_history.xlsx'
+    wb.save(response)
+    return response
+
+
+@login_required
+def view_racks_excel(request):
+    """Export racks to Excel."""
+    if not (request.user.stage == 1 or request.user.stage == 2):
+        messages.error(request, 'Only Stage 1 and 2 users can export racks.')
+        return redirect('inventory:dashboard')
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from django.http import HttpResponse
+
+    racks = Rack.objects.all().order_by('rack_number')
+
+    # Build rack summary
+    rack_summary = []
+    for rack in racks:
+        products = Product.objects.filter(rack=rack)
+
+        total_items = products.count()
+        total_quantity = products.aggregate(total=Sum('quantity_available'))['total'] or 0
+        total_value = products.aggregate(total=Sum(F('quantity_available') * F('price')))['total'] or 0
+
+        rack_summary.append({
+            'rack_number': rack.rack_number,
+            'cabin_name': rack.cabin_name or '',
+            'total_items': total_items,
+            'total_quantity': total_quantity,
+            'total_value': total_value
+        })
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Racks"
+
+    headers = ['Rack', 'Cabin', 'Items', 'Qty', 'Value']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                           top=Side(style='thin'), bottom=Side(style='thin'))
+
+    for row, ri in enumerate(rack_summary, 2):
+        data = [
+            ri['rack_number'],
+            ri['cabin_name'],
+            ri['total_items'],
+            ri['total_quantity'],
+            f"₹{ri['total_value']:.2f}"
+        ]
+        for col, value in enumerate(data, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            cell.border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                               top=Side(style='thin'), bottom=Side(style='thin'))
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename=racks.xlsx'
+    wb.save(response)
+    return response
 
 

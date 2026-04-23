@@ -587,9 +587,9 @@
                 <!-- Material Request Form and Save Request in one line -->
                 <div class="create-form-grid" style="margin-top: 1rem;">
                     <div class="cf-field">
-                        <label class="au-label">Material Request Form (Optional)</label>
+                        <label class="au-label">Material Request Form <span style="color:#ef4444;">*</span></label>
                         <div class="cf-field-inner">
-                            <input type="file" name="material_upload_form" class="file-input-sm" style="width: 100%;">
+                            <input type="file" name="material_upload_form" class="file-input-sm" style="width: 100%;" required>
                         </div>
                     </div>
                     <div class="cf-field"></div>
@@ -888,11 +888,19 @@
                                 </button>
                             </form>
                         </div>
-                        {% elif r.receipt_file %}
-                        <a href="{% url 'inventory:management_upload_request_receipt' pk=r.pk %}"
-                           class="au-btn-sm-outline" target="_blank">
-                            <i class="bi bi-file-earmark-text"></i> View file
-                        </a>
+                        {% elif r.status == 'completed' %}
+                        <div class="action-row-horizontal">
+                            {% if r.receipt_file %}
+                            <a href="{{ r.receipt_file.url }}" class="au-btn-sm-outline" target="_blank">
+                                <i class="bi bi-file-earmark"></i> View File
+                            </a>
+                            {% endif %}
+                            {% if request.user.stage == 1 %}
+                            <button type="button" class="au-btn-sm-outline modify-received-btn" data-pk="{{ r.pk }}" data-qty="{{ r.quantity_received }}" data-requested="{{ r.quantity_requested }}">
+                                <i class="bi bi-pencil-square"></i> Modify
+                            </button>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </td>
                     {% endif %}
@@ -912,11 +920,165 @@
         </div>
     </div>
 
+    <!-- Modify Received Modal -->
+    <div class="modal fade" id="modifyModal" tabindex="-1" aria-labelledby="modifyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modifyModalLabel">Modify Received Quantity</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" id="modifyForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="upload_request_pk" id="modifyPk" value="">
+                        <input type="hidden" name="requested_quantity" id="modifyRequested" value="">
+                        <div class="mb-3">
+                            <label class="form-label">Modification Type</label>
+                            <select class="form-select" name="modification_type" id="modificationType" required>
+                                <option value="add">Add (+)</option>
+                                <option value="subtract">Subtract (-)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" class="form-control" name="modification_quantity" id="modificationQuantity" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes (Optional)</label>
+                            <textarea class="form-control" name="notes" id="modificationNotes" rows="3"></textarea>
+                        </div>
+                        <div class="alert alert-info">
+                            <strong>Requested:</strong> <span id="requestedQty">0</span><br>
+                            <strong>Current Received:</strong> <span id="currentReceived">0</span><br>
+                            <strong>New Received:</strong> <span id="newReceived">0</span><br>
+                            <strong>Remaining:</strong> <span id="remainingQty">0</span>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitModification()">Submit Modification</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// Purchase modification handling
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to all modify-received-btn buttons
+    document.querySelectorAll('.modify-received-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const pk = this.getAttribute('data-pk');
+            const qty = this.getAttribute('data-qty');
+            const requested = this.getAttribute('data-requested');
+            showModifyModal(pk, qty, requested);
+        });
+    });
+
+    // Update new received quantity when modification type or quantity changes
+    const modificationType = document.getElementById('modificationType');
+    const modificationQuantity = document.getElementById('modificationQuantity');
+    if (modificationType && modificationQuantity) {
+        modificationType.addEventListener('change', updateNewReceived);
+        modificationQuantity.addEventListener('input', updateNewReceived);
+    }
+});
+
+function showModifyModal(pk, currentQty, requestedQty) {
+    document.getElementById('modifyPk').value = pk;
+    document.getElementById('modifyRequested').value = requestedQty;
+    document.getElementById('requestedQty').textContent = requestedQty;
+    document.getElementById('currentReceived').textContent = currentQty;
+    document.getElementById('modificationQuantity').value = '';
+    document.getElementById('modificationNotes').value = '';
+    document.getElementById('newReceived').textContent = currentQty;
+    document.getElementById('remainingQty').textContent = requestedQty - currentQty;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modifyModal'));
+    modal.show();
+}
+
+function updateNewReceived() {
+    const currentQty = parseInt(document.getElementById('currentReceived').textContent);
+    const requestedQty = parseInt(document.getElementById('requestedQty').textContent);
+    const modificationType = document.getElementById('modificationType').value;
+    const modificationQuantity = parseInt(document.getElementById('modificationQuantity').value) || 0;
+    
+    let newQty = currentQty;
+    if (modificationType === 'add') {
+        newQty = currentQty + modificationQuantity;
+    } else if (modificationType === 'subtract') {
+        newQty = Math.max(0, currentQty - modificationQuantity);
+    }
+    
+    document.getElementById('newReceived').textContent = newQty;
+    document.getElementById('remainingQty').textContent = requestedQty - newQty;
+}
+
+function submitModification() {
+    const form = document.getElementById('modifyForm');
+    const pk = document.getElementById('modifyPk').value;
+    const modificationType = document.getElementById('modificationType').value;
+    const modificationQuantity = document.getElementById('modificationQuantity').value;
+    const notes = document.getElementById('modificationNotes').value;
+    
+    if (!modificationQuantity || parseInt(modificationQuantity) <= 0) {
+        alert('Please enter a valid quantity.');
+        return;
+    }
+    
+    // Get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrftoken = getCookie('csrftoken');
+    
+    const formData = new FormData();
+    formData.append('upload_request_pk', pk);
+    formData.append('modification_type', modificationType);
+    formData.append('modification_quantity', modificationQuantity);
+    formData.append('notes', notes);
+    formData.append('csrfmiddlewaretoken', csrftoken);
+    
+    fetch("{% url 'inventory:management_upload_request_modify' %}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrftoken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Modification successful!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
+
 (function countStats() {
     const rows = document.querySelectorAll('#tableBody tr[data-status]');
     const counts = { pending:0, completed:0, disclosed:0 };
@@ -973,12 +1135,12 @@ function clearFilters() {
     document.querySelectorAll('#tableBody tr[data-status]').forEach(r => r.style.display = '');
 }
 (function renderCountdowns() {
-    const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+    const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
     const chips = document.querySelectorAll('.auto-disc-chip[data-created]');
     const now   = Date.now();
     chips.forEach(chip => {
         const createdMs  = parseInt(chip.dataset.created, 10) * 1000;
-        const diffMs     = (createdMs + TEN_DAYS_MS) - now;
+        const diffMs     = (createdMs + SIXTY_DAYS_MS) - now;
         const span = chip.querySelector('.disc-countdown');
         if (!span) return;
         if (diffMs <= 0) {
