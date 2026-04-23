@@ -706,7 +706,7 @@
                                     </td>
                                     {% if user.stage == 1 or user.stage == 2 or user.is_superuser %}
                                     <td>{{ r.issued_by.username|default:"—" }}</td>
-                                    <td>{{ r.receiver.username|default:"—" }}</td>
+                                    <td>{{ r.requested_by.username|default:r.requested_by_username|default:"—" }}</td>
                                     {% else %}
                                     <td>{{ r.issued_by.username|default:"—" }}</td>
                                     {% endif %}

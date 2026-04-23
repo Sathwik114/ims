@@ -467,9 +467,11 @@ def dashboard(request):
         type_counts[cat] = Product.objects.filter(category=cat).count()
 
     # Issued-by-category overview for dashboard bar chart (which category issued more)
+    # Use IssueRequest instead of IssueHistory (status='issued' or 'confirmed')
     issued_by_category_rows = (
-        IssueHistory.objects.values('product__category')
-        .annotate(total_qty=Sum('quantity'))
+        IssueRequest.objects.filter(status__in=[IssueRequest.STATUS_ISSUED, IssueRequest.STATUS_CONFIRMED])
+        .values('product__category')
+        .annotate(total_qty=Sum('approved_quantity'))
     )
     issued_totals_by_category = {cat: 0 for cat in categories}
     for row in issued_by_category_rows:
@@ -495,11 +497,11 @@ def dashboard(request):
     if request.user.stage in [1, 2] or request.user.is_superuser:
         # Admin/Stage 1/2: Show all recent logins with IP/hostname and issued items
         recent_logins = LoginHistory.objects.select_related('user').order_by('-logged_in_at')[:6]
-        recent_issued = IssueHistory.objects.select_related('product', 'receiver', 'issued_by').order_by('-issued_at')[:8]
+        recent_issued = IssueRequest.objects.filter(status__in=[IssueRequest.STATUS_ISSUED, IssueRequest.STATUS_CONFIRMED]).select_related('product', 'requested_by', 'issued_by').order_by('-issued_at')[:8]
     else:
         # Stage 3: Show user's own logins and issued items to them
         recent_logins = LoginHistory.objects.filter(user=request.user).order_by('-logged_in_at')[:6]
-        recent_issued = IssueHistory.objects.filter(receiver=request.user).select_related('product', 'issued_by').order_by('-issued_at')[:8]
+        recent_issued = IssueRequest.objects.filter(requested_by=request.user, status__in=[IssueRequest.STATUS_ISSUED, IssueRequest.STATUS_CONFIRMED]).select_related('product', 'issued_by').order_by('-issued_at')[:8]
         
         # Get chart data for each category for users (item counts)
         categories = ['networking', 'hardware', 'security', 'server_parts']
@@ -3285,8 +3287,8 @@ def issued_overview(request):
     from_date = request.GET.get('from_date', '').strip()
     to_date = request.GET.get('to_date', '').strip()
 
-    # Base query with date filtering
-    base_qs = IssueHistory.objects.all()
+    # Base query with date filtering - use IssueRequest instead of IssueHistory
+    base_qs = IssueRequest.objects.filter(status__in=[IssueRequest.STATUS_ISSUED, IssueRequest.STATUS_CONFIRMED])
     if from_date:
         base_qs = base_qs.filter(issued_at__gte=from_date)
     if to_date:
@@ -3295,7 +3297,7 @@ def issued_overview(request):
     # Totals by category (for line chart + table) with amount calculation
     by_category_rows = (
         base_qs.values('product__category')
-        .annotate(total_qty=Sum('quantity'))
+        .annotate(total_qty=Sum('approved_quantity'))
     )
     categories = [c[0] for c in CATEGORY_CHOICES]
     by_category_map = {
@@ -3317,7 +3319,7 @@ def issued_overview(request):
         })
         entry['total'] += row['total_qty'] or 0
 
-    amount_rows = base_qs.values('product__category', 'quantity', 'product__price')
+    amount_rows = base_qs.values('product__category', 'approved_quantity', 'product__price')
     for row in amount_rows:
         normalized_category = _normalize_category_slug(row['product__category'])
         if normalized_category not in by_category_map:
@@ -3327,7 +3329,7 @@ def issued_overview(request):
                 'total': 0,
                 'total_amount': 0,
             }
-        qty = row['quantity'] or 0
+        qty = row['approved_quantity'] or 0
         price = row['product__price'] or 0
         by_category_map[normalized_category]['total_amount'] += qty * price
 
@@ -3339,7 +3341,7 @@ def issued_overview(request):
     # Totals by item (for table) - top 100 items
     by_item_rows = (
         base_qs.values('product__category', 'product__asset_id', 'product__item_name')
-        .annotate(total_qty=Sum('quantity'))
+        .annotate(total_qty=Sum('approved_quantity'))
         .order_by('-total_qty')[:100]
     )
     by_item = [
